@@ -752,12 +752,9 @@ async function enterRoom(roomId, roomName) {
     if (s.exists()) roomMembers[uid]=s.data();
   }));
 
-  // load today's study seconds for me from firestore
-  const tk=todayKey();
-  const daySnap=await getDoc(doc(db,'rooms',roomId,'studyDays',tk));
-  if (daySnap.exists()) {
-    mySeconds = daySnap.data()?.[currentUser.uid] || 0;
-  } else { mySeconds=0; }
+  // đồng hồ local luôn bắt đầu từ 0 mỗi phiên
+  mySeconds = 0;
+  lastAutoSaved = 0;
 
   // realtime listener on all study days for calendar
   roomUnsub = onSnapshot(collection(db,'rooms',roomId,'studyDays'), snap=>{
@@ -785,6 +782,8 @@ function renderClocks() {
 
   Object.entries(roomMembers).forEach(([uid,profile])=>{
     const isMe = uid===currentUser.uid;
+    // đồng hồ hiển thị: phiên hiện tại (mySeconds) nếu là mình,
+    // tổng ngày hôm nay từ Firestore nếu là bạn bè
     const secs = isMe ? mySeconds : (todayData[uid]||0);
 
     const card=document.createElement('div');
@@ -847,26 +846,49 @@ async function stopClock(save) {
     const pb=card.querySelector('.clock-play-btn');
     if (pb) pb.textContent='▶';
   }
-  if (save && currentUser && currentRoomId && mySeconds>0) {
-    await saveStudySeconds();
+
+  if (save && currentUser && currentRoomId && mySeconds >= 900) {
+    // ≥15 phút → cộng dồn vào tổng ngày hôm nay
+    await addStudySeconds(mySeconds);
+    toast('Đã lưu ' + fmtTime(mySeconds) + ' vào lịch! 📅');
+  } else if (save && mySeconds > 0 && mySeconds < 900) {
+    toast('Cần học ít nhất 15 phút để điểm danh 😊');
   }
+
+  // reset đồng hồ local về 0
+  mySeconds = 0;
+  const el = document.getElementById('clocktime-' + currentUser?.uid);
+  if (el) el.textContent = fmtTime(0);
 }
 
-async function saveStudySeconds() {
-  const tk=todayKey();
+async function addStudySeconds(secs) {
+  // Cộng dồn: lấy tổng hiện tại + thêm secs mới
+  const tk = todayKey();
   try {
-    const ref=doc(db,'rooms',currentRoomId,'studyDays',tk);
-    const snap=await getDoc(ref);
+    const ref  = doc(db,'rooms',currentRoomId,'studyDays',tk);
+    const snap = await getDoc(ref);
+    const prev = snap.exists() ? (snap.data()?.[currentUser.uid] || 0) : 0;
+    const newTotal = prev + secs;
     if (snap.exists()) {
-      await updateDoc(ref,{[currentUser.uid]:mySeconds});
+      await updateDoc(ref, { [currentUser.uid]: newTotal });
     } else {
-      await setDoc(ref,{[currentUser.uid]:mySeconds});
+      await setDoc(ref, { [currentUser.uid]: newTotal });
     }
-  } catch(e) { console.error('save study err',e); }
+  } catch(e) { console.error('save study err', e); }
 }
 
-// Auto-save every 60s while running
-setInterval(()=>{ if(isRunning && currentRoomId) saveStudySeconds(); }, 60000);
+// Auto-save mỗi 60s (lưu tạm, không reset) để không mất data nếu tắt tab
+let lastAutoSaved = 0;
+setInterval(async () => {
+  if (isRunning && currentRoomId && mySeconds > lastAutoSaved) {
+    const delta = mySeconds - lastAutoSaved;
+    if (delta > 0) {
+      // chỉ auto-save nếu đã học ≥15 phút tổng phiên này
+      if (mySeconds >= 900) await addStudySeconds(delta);
+      lastAutoSaved = mySeconds;
+    }
+  }
+}, 60000);
 
 // Reset at midnight
 function scheduleMidnightReset() {
