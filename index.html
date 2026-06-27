@@ -503,6 +503,136 @@
     }
     .lightbox.open { display:flex; }
     .lightbox img { max-width:90vw; max-height:90vh; border-radius:12px; object-fit:contain; }
+
+    /* ── ROOM MANAGEMENT MENU (topbar icon) ── */
+    .room-manage-btn { font-size:18px; }
+    .manage-menu-dropdown {
+      display:none; position:absolute; top:calc(100% + 8px); right:0;
+      background:#fff; border:2px solid var(--border); border-radius:16px;
+      padding:8px; min-width:200px; box-shadow:0 8px 24px rgba(0,0,0,.1); z-index:50;
+    }
+    .manage-menu-dropdown.open { display:block; }
+    .manage-menu-dropdown button {
+      display:flex; align-items:center; gap:10px;
+      width:100%; padding:10px 14px; border:none; background:none;
+      font-family:'Nunito',sans-serif; font-size:14px; font-weight:700;
+      cursor:pointer; border-radius:10px; color:var(--text); transition:background .15s;
+    }
+    .manage-menu-dropdown button:hover { background:#f0fdf4; color:var(--green-d); }
+    .manage-menu-dropdown button.danger { color:var(--red); }
+    .manage-menu-dropdown button.danger:hover { background:#fff0f0; }
+    .manage-menu-wrap { position:relative; }
+    .manage-divider { height:1px; background:var(--border); margin:4px 8px; }
+
+    /* ── MEMBERS LIST MODAL ── */
+    .member-row {
+      display:flex; align-items:center; gap:12px;
+      padding:10px 0; border-bottom:1px solid var(--border);
+    }
+    .member-row:last-child { border-bottom:none; }
+    .member-info { flex:1; }
+    .member-name { font-weight:800; font-size:14px; }
+    .member-tag  { font-size:11px; color:var(--muted); }
+    .member-kick {
+      background:none; border:1px solid #ffcccc; color:var(--red);
+      padding:4px 10px; border-radius:8px; font-size:12px; font-weight:700;
+      cursor:pointer; transition:background .15s;
+    }
+    .member-kick:hover { background:#fff0f0; }
+
+    /* ── VIDEO CALL SCREEN ── */
+    #screen-call {
+      display:none; position:fixed; inset:0; z-index:200;
+      background:#0a1a0a; flex-direction:column;
+    }
+    #screen-call.active { display:flex; }
+
+    /* Incoming call overlay */
+    #call-incoming {
+      display:none; position:fixed; inset:0; z-index:300;
+      background:rgba(0,0,0,.75); align-items:center; justify-content:center;
+    }
+    #call-incoming.active { display:flex; }
+    .incoming-card {
+      background:#fff; border-radius:24px; padding:32px 28px;
+      text-align:center; width:100%; max-width:320px;
+      box-shadow:0 16px 48px rgba(0,0,0,.3);
+      animation:popIn .3s cubic-bezier(.34,1.56,.64,1);
+    }
+    .incoming-card .caller-av { font-size:56px; margin-bottom:8px; }
+    .incoming-card h3 { font-size:18px; font-weight:900; margin-bottom:4px; }
+    .incoming-card p  { font-size:13px; color:var(--muted); margin-bottom:24px; }
+    .incoming-actions { display:flex; gap:12px; }
+    .btn-accept { flex:1; padding:14px; background:#58CC02; color:#fff; border:none; border-radius:14px; font-family:'Nunito',sans-serif; font-size:15px; font-weight:800; cursor:pointer; }
+    .btn-decline { flex:1; padding:14px; background:var(--red); color:#fff; border:none; border-radius:14px; font-family:'Nunito',sans-serif; font-size:15px; font-weight:800; cursor:pointer; }
+
+    /* Call topbar */
+    .call-topbar {
+      display:flex; align-items:center; gap:12px;
+      padding:12px 16px; background:rgba(0,0,0,.4);
+    }
+    .call-room-name { flex:1; color:#fff; font-weight:900; font-size:15px; }
+    .call-timer { color:#7fc87f; font-weight:800; font-size:14px; font-family:monospace; }
+
+    /* Main video */
+    .call-main-video {
+      flex:1; display:flex; align-items:center; justify-content:center;
+      position:relative; overflow:hidden;
+    }
+    .call-main-video video {
+      width:100%; height:100%; object-fit:cover;
+    }
+    .main-video-label {
+      position:absolute; bottom:12px; left:12px;
+      background:rgba(0,0,0,.5); color:#fff;
+      padding:4px 10px; border-radius:20px; font-size:13px; font-weight:700;
+    }
+    .video-off-placeholder {
+      width:100%; height:100%; background:#1a2a1a;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    }
+    .video-off-placeholder .big-av { font-size:72px; }
+    .video-off-placeholder p { color:#7fc87f; font-weight:800; font-size:16px; }
+
+    /* Scroll strip */
+    .call-strip {
+      display:flex; gap:10px; overflow-x:auto; padding:10px 14px;
+      background:rgba(0,0,0,.3);
+    }
+    .call-strip::-webkit-scrollbar { height:4px; }
+    .call-strip::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); border-radius:4px; }
+    .call-thumb {
+      min-width:90px; height:64px; border-radius:12px; background:#1a2a1a;
+      flex-shrink:0; position:relative; cursor:pointer; overflow:hidden;
+      border:2px solid transparent; transition:border-color .2s;
+    }
+    .call-thumb.active { border-color:var(--green); }
+    .call-thumb video { width:100%; height:100%; object-fit:cover; }
+    .call-thumb-label {
+      position:absolute; bottom:2px; left:4px;
+      font-size:10px; font-weight:700; color:#fff;
+      background:rgba(0,0,0,.5); padding:1px 6px; border-radius:8px;
+    }
+    .call-thumb-av {
+      width:100%; height:100%; display:flex; align-items:center;
+      justify-content:center; font-size:28px;
+    }
+
+    /* Controls */
+    .call-controls {
+      display:flex; align-items:center; justify-content:center; gap:14px;
+      padding:14px; background:rgba(0,0,0,.4);
+    }
+    .ctrl-btn {
+      width:52px; height:52px; border-radius:50%; border:none;
+      background:rgba(255,255,255,.15); color:#fff; font-size:22px;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      transition:background .15s;
+    }
+    .ctrl-btn:hover { background:rgba(255,255,255,.25); }
+    .ctrl-btn.off { background:rgba(255,75,75,.6); }
+    .ctrl-btn.end { background:var(--red); width:60px; height:60px; font-size:26px; }
+    .ctrl-btn.end:hover { background:#c43b3b; }
   </style>
 </head>
 <body>
@@ -624,6 +754,17 @@
     <div class="room-topbar">
       <span class="room-name-label" id="room-name-display">Phòng học</span>
       <button class="icon-btn" id="btn-copy-code" title="Sao chép mã phòng">📋</button>
+      <!-- manage menu -->
+      <div class="manage-menu-wrap">
+        <button class="icon-btn room-manage-btn" id="btn-manage-room" title="Quản lý phòng">⚙️</button>
+        <div class="manage-menu-dropdown" id="manage-menu">
+          <button id="menu-members">👥 Danh sách thành viên</button>
+          <div class="manage-divider"></div>
+          <button id="menu-edit-room">✏️ Đổi tên / mã phòng</button>
+          <button id="menu-leave-room" class="danger">🚪 Rời phòng</button>
+          <button id="menu-delete-room" class="danger" style="display:none">🗑️ Xoá phòng</button>
+        </div>
+      </div>
       <div class="user-menu-wrap">
         <div id="room-avatar-wrap"></div>
         <div class="user-menu-dropdown" id="user-menu">
@@ -694,6 +835,88 @@
 <!-- lightbox -->
 <div class="lightbox" id="lightbox"><img id="lightbox-img" src="" alt="" /></div>
 
+<!-- modal: members list -->
+<div class="modal-overlay" id="modal-members">
+  <div class="modal">
+    <h3>👥 Thành viên</h3>
+    <p id="members-modal-sub">Phòng học</p>
+    <div id="members-list-body"></div>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="btn btn-ghost" id="btn-close-members">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: edit room -->
+<div class="modal-overlay" id="modal-edit-room">
+  <div class="modal">
+    <h3>✏️ Chỉnh sửa phòng</h3>
+    <p>Chỉ chủ phòng mới có thể thay đổi</p>
+    <input class="input-field" id="edit-room-name-input" placeholder="Tên phòng mới" maxlength="40" />
+    <input class="input-field" id="edit-room-code-input" placeholder="Mã phòng mới (4–10 ký tự)" maxlength="10" />
+    <p style="font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:12px">⚠️ Đổi mã phòng sẽ làm mã cũ không còn hiệu lực</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btn-cancel-edit-room">Huỷ</button>
+      <button class="btn btn-green" id="btn-save-edit-room">Lưu ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal: confirm delete/leave -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal">
+    <h3 id="confirm-title">Xác nhận</h3>
+    <p id="confirm-body">Bạn có chắc không?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btn-cancel-confirm">Huỷ</button>
+      <button class="btn btn-red"   id="btn-ok-confirm">Xác nhận</button>
+    </div>
+  </div>
+</div>
+
+<!-- INCOMING CALL overlay -->
+<div id="call-incoming">
+  <div class="incoming-card">
+    <div class="caller-av" id="incoming-caller-av">📹</div>
+    <h3 id="incoming-caller-name">Ai đó</h3>
+    <p>đang gọi video cho phòng học</p>
+    <div class="incoming-actions">
+      <button class="btn-decline" id="btn-decline-call">✕ Từ chối</button>
+      <button class="btn-accept"  id="btn-accept-call">📹 Chấp nhận</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIDEO CALL SCREEN -->
+<div id="screen-call">
+  <div class="call-topbar">
+    <span class="call-room-name" id="call-room-name">Phòng học</span>
+    <span class="call-timer" id="call-timer">00:00</span>
+    <button class="icon-btn" style="color:#fff;font-size:20px" id="btn-call-back" title="Thu nhỏ">✕</button>
+  </div>
+
+  <!-- main video -->
+  <div class="call-main-video" id="call-main-area">
+    <div class="video-off-placeholder" id="main-video-placeholder">
+      <div class="big-av" id="main-video-av">🐣</div>
+      <p id="main-video-name">Bạn</p>
+    </div>
+    <video id="main-video-el" autoplay playsinline style="display:none"></video>
+    <div class="main-video-label" id="main-video-label">Bạn</div>
+  </div>
+
+  <!-- scroll strip -->
+  <div class="call-strip" id="call-strip"></div>
+
+  <!-- controls -->
+  <div class="call-controls">
+    <button class="ctrl-btn" id="ctrl-mic" title="Tắt/bật mic">🎙️</button>
+    <button class="ctrl-btn" id="ctrl-cam" title="Tắt/bật camera">📷</button>
+    <button class="ctrl-btn end" id="ctrl-end" title="Kết thúc cuộc gọi">📵</button>
+    <button class="ctrl-btn" id="ctrl-flip" title="Đổi camera (di động)">🔄</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- ══════════════════════ FIREBASE + LOGIC ══════════════════════ -->
@@ -702,8 +925,8 @@ import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.12.0/fir
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
                              from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot,
-         collection, addDoc, query, orderBy, limit,
-         arrayUnion, serverTimestamp, increment }
+         collection, addDoc, query, orderBy, limit, deleteDoc,
+         arrayUnion, arrayRemove, serverTimestamp, increment, writeBatch }
                              from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -723,14 +946,24 @@ const db   = getFirestore(app);
 let currentUser   = null;
 let userProfile   = null;
 let currentRoomId = null;
+let currentRoomData = null;   // full room doc
 let roomMembers   = {};
 let roomUnsub     = null;
 let chatUnsub     = null;
+let callUnsub     = null;     // listener phòng call
 let clockInterval = null;
 let mySeconds     = 0;
 let isRunning     = false;
 let calYear, calMonth;
 let studyData     = {};
+
+// WebRTC
+let localStream   = null;
+let peerConns     = {};       // uid → RTCPeerConnection
+let callTimerInt  = null;
+let callSeconds   = 0;
+let micOn = true, camOn = true;
+let facingMode = 'user';
 
 /* ── HELPERS ── */
 function showScreen(id) {
@@ -973,7 +1206,9 @@ document.getElementById('btn-join-room').addEventListener('click', async ()=>{
 ══════════════════════════════════════════ */
 async function enterRoom(roomId, roomName) {
   // cleanup previous
-  if (roomUnsub) { roomUnsub(); roomUnsub=null; }
+  if (roomUnsub)  { roomUnsub();  roomUnsub=null;  }
+  if (chatUnsub)  { chatUnsub();  chatUnsub=null;  }
+  if (callUnsub)  { callUnsub();  callUnsub=null;  }
   stopClock(false);
 
   currentRoomId = roomId;
@@ -990,9 +1225,17 @@ async function enterRoom(roomId, roomName) {
 
   showScreen('screen-room');
 
-  // load member profiles
+  // load room data + member profiles
   const roomSnap=await getDoc(doc(db,'rooms',roomId));
-  const members=(roomSnap.data()?.members||[]);
+  currentRoomData = roomSnap.data();
+  const members=(currentRoomData?.members||[]);
+  const isOwner = currentRoomData?.createdBy === currentUser.uid;
+
+  // show/hide owner-only buttons
+  document.getElementById('menu-delete-room').style.display = isOwner ? 'block' : 'none';
+  document.getElementById('menu-edit-room').style.display   = isOwner ? 'flex'  : 'none';
+  document.getElementById('menu-leave-room').style.display  = isOwner ? 'none'  : 'flex';
+
   roomMembers={};
   await Promise.all(members.map(async uid=>{
     const s=await getDoc(doc(db,'users',uid));
@@ -1017,6 +1260,7 @@ async function enterRoom(roomId, roomName) {
   renderCalendar();
   renderClocks();
   initChat(roomId);
+  listenCall(roomId);
 }
 
 /* ══════════════════════════════════════════
@@ -1501,6 +1745,367 @@ function renderChatMsg(data, id) {
 document.getElementById('lightbox').addEventListener('click', ()=>{
   document.getElementById('lightbox').classList.remove('open');
 });
+
+/* ══════════════════════════════════════════
+   MANAGE MENU
+══════════════════════════════════════════ */
+document.getElementById('btn-manage-room').addEventListener('click', e=>{
+  e.stopPropagation();
+  document.getElementById('manage-menu').classList.toggle('open');
+  document.getElementById('user-menu').classList.remove('open');
+});
+document.addEventListener('click', e=>{
+  const mw = document.querySelector('.manage-menu-wrap');
+  if (mw && !mw.contains(e.target)) document.getElementById('manage-menu').classList.remove('open');
+});
+
+/* ── MEMBERS LIST ── */
+document.getElementById('menu-members').addEventListener('click', async ()=>{
+  document.getElementById('manage-menu').classList.remove('open');
+  const body = document.getElementById('members-list-body');
+  body.innerHTML = '<div class="spinner"></div>';
+  document.getElementById('members-modal-sub').textContent =
+    (currentRoomData?.name||'Phòng học') + ' · ' + Object.keys(roomMembers).length + ' thành viên';
+  openModal('modal-members');
+  body.innerHTML='';
+  const isOwner = currentRoomData?.createdBy === currentUser.uid;
+  Object.entries(roomMembers).forEach(([uid, profile])=>{
+    const row = document.createElement('div');
+    row.className = 'member-row';
+    const isMe = uid === currentUser.uid;
+    const isRoomOwner = uid === currentRoomData?.createdBy;
+    row.innerHTML=`
+      <div style="font-size:28px;width:36px;text-align:center">${profile.avatarURL?.startsWith('data:')?'🙂':profile.avatarURL||'🐣'}</div>
+      <div class="member-info">
+        <div class="member-name">${profile.name}${isMe?' (Bạn)':''}</div>
+        <div class="member-tag">${isRoomOwner?'👑 Chủ phòng':'Thành viên'}</div>
+      </div>`;
+    if (isOwner && !isMe && !isRoomOwner) {
+      const kb = document.createElement('button');
+      kb.className='member-kick'; kb.textContent='Kick';
+      kb.addEventListener('click', ()=> kickMember(uid, profile.name));
+      row.appendChild(kb);
+    }
+    body.appendChild(row);
+  });
+});
+document.getElementById('btn-close-members').addEventListener('click',()=>closeModal('modal-members'));
+
+async function kickMember(uid, name) {
+  if (!confirm(`Kick "${name}" khỏi phòng?`)) return;
+  try {
+    await updateDoc(doc(db,'rooms',currentRoomId), { members: arrayRemove(uid) });
+    await updateDoc(doc(db,'users',uid), { rooms: arrayRemove(currentRoomId) });
+    delete roomMembers[uid];
+    toast(`Đã kick ${name} 👋`); closeModal('modal-members');
+  } catch(e) { toast('Lỗi: '+e.message); }
+}
+
+/* ── EDIT ROOM ── */
+document.getElementById('menu-edit-room').addEventListener('click',()=>{
+  document.getElementById('manage-menu').classList.remove('open');
+  document.getElementById('edit-room-name-input').value = currentRoomData?.name||'';
+  document.getElementById('edit-room-code-input').value = currentRoomId||'';
+  openModal('modal-edit-room');
+});
+document.getElementById('btn-cancel-edit-room').addEventListener('click',()=>closeModal('modal-edit-room'));
+document.getElementById('btn-save-edit-room').addEventListener('click', async ()=>{
+  const newName = document.getElementById('edit-room-name-input').value.trim();
+  const newCode = document.getElementById('edit-room-code-input').value.trim().toUpperCase().replace(/\s+/g,'');
+  if (!newName) { toast('Nhập tên phòng nhé!'); return; }
+  if (newCode.length < 4) { toast('Mã phòng ít nhất 4 ký tự!'); return; }
+  const btn = document.getElementById('btn-save-edit-room');
+  btn.textContent='Đang lưu...'; btn.disabled=true;
+  try {
+    const codeChanged = newCode !== currentRoomId;
+    if (codeChanged) {
+      const ex = await getDoc(doc(db,'rooms',newCode));
+      if (ex.exists()) { toast('Mã này đã có người dùng!'); return; }
+      const batch = writeBatch(db);
+      batch.set(doc(db,'rooms',newCode), { ...currentRoomData, name: newName });
+      batch.delete(doc(db,'rooms',currentRoomId));
+      await batch.commit();
+      const members = currentRoomData?.members||[];
+      await Promise.all(members.map(uid=>
+        updateDoc(doc(db,'users',uid),{ rooms: arrayRemove(currentRoomId) })
+          .then(()=>updateDoc(doc(db,'users',uid),{ rooms: arrayUnion(newCode) }))
+      ));
+      const oldId = currentRoomId;
+      currentRoomId = newCode;
+      currentRoomData = { ...currentRoomData, name: newName };
+      if (userProfile.rooms) userProfile.rooms = userProfile.rooms.map(r=>r===oldId?newCode:r);
+    } else {
+      await updateDoc(doc(db,'rooms',currentRoomId), { name: newName });
+      currentRoomData = { ...currentRoomData, name: newName };
+    }
+    document.getElementById('room-name-display').textContent = newName;
+    document.getElementById('sidebar-room-name').textContent = newName;
+    closeModal('modal-edit-room');
+    toast('Đã cập nhật! ✅' + (codeChanged?' Mã mới: '+newCode:''));
+    if (codeChanged) await loadRooms();
+  } catch(e) { toast('Lỗi: '+e.message); }
+  finally { btn.textContent='Lưu ✓'; btn.disabled=false; }
+});
+
+/* ── LEAVE ROOM ── */
+document.getElementById('menu-leave-room').addEventListener('click',()=>{
+  document.getElementById('manage-menu').classList.remove('open');
+  document.getElementById('confirm-title').textContent = '🚪 Rời phòng';
+  document.getElementById('confirm-body').textContent  = 'Bạn có chắc muốn rời phòng "' + (currentRoomData?.name||currentRoomId) + '"?';
+  document.getElementById('btn-ok-confirm').onclick = doLeaveRoom;
+  openModal('modal-confirm');
+});
+document.getElementById('btn-cancel-confirm').addEventListener('click',()=>closeModal('modal-confirm'));
+
+async function doLeaveRoom() {
+  closeModal('modal-confirm');
+  try {
+    await updateDoc(doc(db,'rooms',currentRoomId),{ members: arrayRemove(currentUser.uid) });
+    await updateDoc(doc(db,'users',currentUser.uid),{ rooms: arrayRemove(currentRoomId) });
+    userProfile.rooms = (userProfile.rooms||[]).filter(r=>r!==currentRoomId);
+    toast('Đã rời phòng 👋');
+    stopClock(false); showScreen('screen-home'); await loadRooms();
+  } catch(e) { toast('Lỗi: '+e.message); }
+}
+
+/* ── DELETE ROOM ── */
+document.getElementById('menu-delete-room').addEventListener('click',()=>{
+  document.getElementById('manage-menu').classList.remove('open');
+  document.getElementById('confirm-title').textContent = '🗑️ Xoá phòng';
+  document.getElementById('confirm-body').textContent  = 'Xoá phòng "' + (currentRoomData?.name||currentRoomId) + '"? Không thể hoàn tác!';
+  document.getElementById('btn-ok-confirm').onclick = doDeleteRoom;
+  openModal('modal-confirm');
+});
+
+async function doDeleteRoom() {
+  closeModal('modal-confirm');
+  try {
+    const members = currentRoomData?.members||[];
+    await Promise.all(members.map(uid=>updateDoc(doc(db,'users',uid),{ rooms: arrayRemove(currentRoomId) })));
+    await deleteDoc(doc(db,'rooms',currentRoomId));
+    userProfile.rooms = (userProfile.rooms||[]).filter(r=>r!==currentRoomId);
+    toast('Đã xoá phòng 🗑️');
+    stopClock(false); showScreen('screen-home'); await loadRooms();
+  } catch(e) { toast('Lỗi: '+e.message); }
+}
+
+/* ══════════════════════════════════════════
+   VIDEO CALL  (WebRTC + Firestore signaling)
+══════════════════════════════════════════ */
+const ICE_SERVERS = { iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'}
+]};
+
+function listenCall(roomId) {
+  if (callUnsub) { callUnsub(); callUnsub=null; }
+  callUnsub = onSnapshot(doc(db,'rooms',roomId,'call','status'), snap=>{
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (!data.active) { document.getElementById('call-incoming').classList.remove('active'); return; }
+    if (!document.getElementById('screen-call').classList.contains('active')) {
+      if (data.startedBy !== currentUser.uid) {
+        const caller = roomMembers[data.startedBy];
+        document.getElementById('incoming-caller-av').textContent =
+          caller?.avatarURL?.startsWith('data:') ? '📹' : (caller?.avatarURL||'📹');
+        document.getElementById('incoming-caller-name').textContent = caller?.name||'Bạn bè';
+        document.getElementById('call-incoming').classList.add('active');
+      }
+    }
+  });
+}
+
+document.getElementById('video-placeholder').addEventListener('click', ()=> startCall(true));
+document.getElementById('btn-accept-call').addEventListener('click', ()=>{
+  document.getElementById('call-incoming').classList.remove('active'); startCall(false);
+});
+document.getElementById('btn-decline-call').addEventListener('click', ()=>{
+  document.getElementById('call-incoming').classList.remove('active'); toast('Đã từ chối cuộc gọi');
+});
+
+async function startCall(initiator) {
+  try { localStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true }); }
+  catch(e) {
+    try { localStream = await navigator.mediaDevices.getUserMedia({ video:false, audio:true }); }
+    catch(e2) { toast('Không thể truy cập camera/mic 😔'); return; }
+  }
+  if (initiator) {
+    await setDoc(doc(db,'rooms',currentRoomId,'call','status'),{
+      active:true, startedBy:currentUser.uid, startedAt:serverTimestamp()
+    });
+  }
+  micOn=true; camOn=true; updateCtrlBtns();
+  document.getElementById('screen-call').classList.add('active');
+  document.getElementById('call-room-name').textContent = currentRoomData?.name||'Phòng học';
+  callSeconds=0;
+  if (callTimerInt) clearInterval(callTimerInt);
+  callTimerInt = setInterval(()=>{
+    callSeconds++;
+    const m=Math.floor(callSeconds/60),s=callSeconds%60;
+    document.getElementById('call-timer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  },1000);
+  showLocalInMain();
+  renderCallStrip();
+  const others = Object.keys(roomMembers).filter(u=>u!==currentUser.uid);
+  for (const uid of others) await createPeer(uid, initiator);
+  listenSignal();
+}
+
+function showLocalInMain() {
+  const mv=document.getElementById('main-video-el');
+  const ph=document.getElementById('main-video-placeholder');
+  if (localStream && camOn) {
+    mv.srcObject=localStream; mv.style.display='block'; ph.style.display='none';
+  } else {
+    mv.style.display='none'; ph.style.display='flex';
+    document.getElementById('main-video-av').textContent=userProfile.avatarURL?.startsWith('data:')?'🐣':(userProfile.avatarURL||'🐣');
+    document.getElementById('main-video-name').textContent=userProfile.name;
+  }
+  document.getElementById('main-video-label').textContent=userProfile.name+' (Bạn)';
+}
+
+function renderCallStrip() {
+  const strip=document.getElementById('call-strip'); strip.innerHTML='';
+  const myThumb=makeThumb(currentUser.uid,userProfile,localStream,true);
+  myThumb.classList.add('active');
+  myThumb.addEventListener('click',()=>switchMain(currentUser.uid));
+  strip.appendChild(myThumb);
+  Object.entries(roomMembers).forEach(([uid,profile])=>{
+    if (uid===currentUser.uid) return;
+    const th=makeThumb(uid,profile,peerConns[uid]?._remoteStream||null,false);
+    th.addEventListener('click',()=>switchMain(uid));
+    strip.appendChild(th);
+  });
+}
+
+function makeThumb(uid,profile,stream,isLocal) {
+  const th=document.createElement('div'); th.className='call-thumb'; th.id='thumb-'+uid;
+  if (stream) {
+    const v=document.createElement('video');
+    v.autoplay=true; v.playsInline=true; v.muted=isLocal; v.srcObject=stream;
+    v.style.cssText='width:100%;height:100%;object-fit:cover;'; th.appendChild(v);
+  } else {
+    const av=document.createElement('div'); av.className='call-thumb-av';
+    av.textContent=profile.avatarURL?.startsWith('data:')?'🐣':(profile.avatarURL||'🐣');
+    th.appendChild(av);
+  }
+  const lbl=document.createElement('div'); lbl.className='call-thumb-label';
+  lbl.textContent=profile.name+(isLocal?' (Bạn)':''); th.appendChild(lbl);
+  return th;
+}
+
+function switchMain(uid) {
+  document.querySelectorAll('.call-thumb').forEach(t=>t.classList.remove('active'));
+  const thumb=document.getElementById('thumb-'+uid);
+  if (thumb) thumb.classList.add('active');
+  const mv=document.getElementById('main-video-el');
+  const ph=document.getElementById('main-video-placeholder');
+  const profile=uid===currentUser.uid?userProfile:roomMembers[uid];
+  const stream=uid===currentUser.uid?localStream:(peerConns[uid]?._remoteStream||null);
+  if (stream) {
+    mv.srcObject=stream; mv.muted=(uid===currentUser.uid); mv.style.display='block'; ph.style.display='none';
+  } else {
+    mv.style.display='none'; ph.style.display='flex';
+    document.getElementById('main-video-av').textContent=profile?.avatarURL?.startsWith('data:')?'🐣':(profile?.avatarURL||'🐣');
+    document.getElementById('main-video-name').textContent=profile?.name||'Bạn';
+  }
+  document.getElementById('main-video-label').textContent=(profile?.name||'Bạn');
+}
+
+async function createPeer(remoteUid, isInitiator) {
+  const pc=new RTCPeerConnection(ICE_SERVERS);
+  peerConns[remoteUid]=pc;
+  if (localStream) localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  pc.onicecandidate=async e=>{
+    if (e.candidate) await addDoc(collection(db,'rooms',currentRoomId,'call','signals','ice'),{
+      from:currentUser.uid, to:remoteUid, candidate:e.candidate.toJSON(), ts:serverTimestamp()
+    });
+  };
+  pc.ontrack=e=>{
+    pc._remoteStream=e.streams[0]||new MediaStream([e.track]);
+    renderCallStrip();
+  };
+  if (isInitiator) {
+    const offer=await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await addDoc(collection(db,'rooms',currentRoomId,'call','signals','offers'),{
+      from:currentUser.uid, to:remoteUid, sdp:offer.sdp, type:offer.type, ts:serverTimestamp()
+    });
+  }
+  return pc;
+}
+
+function listenSignal() {
+  onSnapshot(query(collection(db,'rooms',currentRoomId,'call','signals','offers'),orderBy('ts')),async snap=>{
+    for (const ch of snap.docChanges()) {
+      if (ch.type!=='added') continue;
+      const d=ch.doc.data(); if (d.to!==currentUser.uid) continue;
+      let pc=peerConns[d.from]; if (!pc) pc=await createPeer(d.from,false);
+      if (pc.signalingState==='stable') continue;
+      await pc.setRemoteDescription({type:d.type,sdp:d.sdp});
+      const ans=await pc.createAnswer(); await pc.setLocalDescription(ans);
+      await addDoc(collection(db,'rooms',currentRoomId,'call','signals','answers'),{
+        from:currentUser.uid, to:d.from, sdp:ans.sdp, type:ans.type, ts:serverTimestamp()
+      });
+    }
+  });
+  onSnapshot(query(collection(db,'rooms',currentRoomId,'call','signals','answers'),orderBy('ts')),async snap=>{
+    for (const ch of snap.docChanges()) {
+      if (ch.type!=='added') continue;
+      const d=ch.doc.data(); if (d.to!==currentUser.uid) continue;
+      const pc=peerConns[d.from];
+      if (pc&&pc.signalingState==='have-local-offer') await pc.setRemoteDescription({type:d.type,sdp:d.sdp});
+    }
+  });
+  onSnapshot(query(collection(db,'rooms',currentRoomId,'call','signals','ice'),orderBy('ts')),async snap=>{
+    for (const ch of snap.docChanges()) {
+      if (ch.type!=='added') continue;
+      const d=ch.doc.data(); if (d.to!==currentUser.uid) continue;
+      const pc=peerConns[d.from];
+      if (pc) try { await pc.addIceCandidate(new RTCIceCandidate(d.candidate)); } catch(e) {}
+    }
+  });
+}
+
+document.getElementById('ctrl-mic').addEventListener('click',()=>{
+  micOn=!micOn;
+  if (localStream) localStream.getAudioTracks().forEach(t=>t.enabled=micOn);
+  updateCtrlBtns();
+});
+document.getElementById('ctrl-cam').addEventListener('click',()=>{
+  camOn=!camOn;
+  if (localStream) localStream.getVideoTracks().forEach(t=>t.enabled=camOn);
+  showLocalInMain(); updateCtrlBtns();
+});
+document.getElementById('ctrl-flip').addEventListener('click', async ()=>{
+  facingMode=facingMode==='user'?'environment':'user';
+  try {
+    const ns=await navigator.mediaDevices.getUserMedia({video:{facingMode},audio:true});
+    const newTrack=ns.getVideoTracks()[0];
+    Object.values(peerConns).forEach(pc=>{
+      const s=pc.getSenders().find(s=>s.track?.kind==='video'); if (s) s.replaceTrack(newTrack);
+    });
+    if (localStream) { localStream.getVideoTracks().forEach(t=>{t.stop();localStream.removeTrack(t);}); localStream.addTrack(newTrack); }
+    showLocalInMain();
+  } catch(e) { toast('Không thể đổi camera 😔'); }
+});
+document.getElementById('ctrl-end').addEventListener('click', endCall);
+document.getElementById('btn-call-back').addEventListener('click', endCall);
+
+function endCall() {
+  if (callTimerInt) { clearInterval(callTimerInt); callTimerInt=null; }
+  if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  Object.values(peerConns).forEach(pc=>pc.close()); peerConns={};
+  document.getElementById('screen-call').classList.remove('active');
+  if (currentRoomId) setDoc(doc(db,'rooms',currentRoomId,'call','status'),{active:false},{merge:true});
+}
+
+function updateCtrlBtns() {
+  document.getElementById('ctrl-mic').textContent=micOn?'🎙️':'🔇';
+  document.getElementById('ctrl-cam').textContent=camOn?'📷':'🚫';
+  document.getElementById('ctrl-mic').classList.toggle('off',!micOn);
+  document.getElementById('ctrl-cam').classList.toggle('off',!camOn);
+}
 </script>
 </body>
 </html>
