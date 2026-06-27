@@ -40,5 +40,24 @@
             }
         });
     </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-analytics.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAEwXt2HFodIw426l_cmQ5Sk9QA185w8gA",
+            authDomain: "studywithmeanytime-7a4c7.firebaseapp.com",
+            projectId: "studywithmeanytime-7a4c7",
+            storageBucket: "studywithmeanytime-7a4c7.firebasestorage.app",
+            messagingSenderId: "955853276835",
+            appId: "1:955853276835:web:5c2144a69bc28d6902e116",
+            measurementId: "G-ZW4ZSW263Y"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        console.log("Firebase đã được kết nối thành công!");
+    </script>
 </body>
 </html>
