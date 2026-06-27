@@ -399,6 +399,7 @@
       flex-shrink: 0;
     }
 
+
     .spinner {
       width: 48px; height: 48px;
       border: 4px solid #e8f5e9;
@@ -408,6 +409,35 @@
       margin: 40px auto;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── EMOJI AVATAR GRID ── */
+    .avatar-or-divider {
+      display: flex; align-items: center; gap: 8px;
+      margin: 12px 0 10px;
+      color: var(--muted); font-size: 12px; font-weight: 700;
+    }
+    .avatar-or-divider::before,
+    .avatar-or-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .default-avatar-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .emoji-av-btn {
+      aspect-ratio: 1;
+      background: #f0fdf4;
+      border: 2px solid transparent;
+      border-radius: 12px;
+      font-size: 22px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .emoji-av-btn:hover  { border-color: var(--green); background: #e8f8e0; }
+    .emoji-av-btn.selected { border-color: var(--green); background: #d4f5c4; }
 
     .loading-screen {
       display: flex;
@@ -447,6 +477,9 @@
       <div class="avatar-edit-badge">✏️</div>
     </div>
     <input type="file" id="avatar-file-input" accept="image/*" />
+
+    <div class="avatar-or-divider">hoặc chọn avatar có sẵn</div>
+    <div class="default-avatar-grid" id="default-avatar-grid"></div>
 
     <input class="input-field" id="username-input" type="text" placeholder="Tên hiển thị của bạn" maxlength="30" />
     <button class="btn btn-green" id="btn-start">Bắt đầu học 🚀</button>
@@ -552,8 +585,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged }
 import { getFirestore, doc, setDoc, getDoc, updateDoc,
          collection, addDoc, getDocs, query, where, arrayUnion, onSnapshot }
                                   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL }
-                                  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
 
 /* ── CONFIG ── */
 const firebaseConfig = {
@@ -568,7 +600,7 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-const storage = getStorage(app);
+
 
 /* ── STATE ── */
 let currentUser   = null;   // Firebase user
@@ -595,58 +627,102 @@ function openModal(id)  { document.getElementById(id).classList.add('open');  }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 function avatarEl(src, size = 40) {
-  if (src) {
+  // base64 image
+  if (src && src.startsWith('data:')) {
     const img = document.createElement('img');
     img.src = src; img.className = 'avatar-img';
     img.style.width = img.style.height = size + 'px';
     return img;
   }
+  // emoji or null
   const d = document.createElement('div');
   d.className = 'avatar-sm-el';
   d.style.width = d.style.height = size + 'px';
   d.style.fontSize = Math.round(size * .45) + 'px';
-  d.textContent = '🐣';
+  d.textContent = src || '🐣';
   return d;
 }
 
 /* ═══════════════════════════════════════════
-   AUTH FLOW
+   AUTH FLOW — chờ Firebase Auth khởi động xong
 ═══════════════════════════════════════════ */
 onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    currentUser = user;
-    const snap = await getDoc(doc(db, 'users', user.uid));
-    if (snap.exists()) {
-      userProfile = snap.data();
-      renderHome();
-      showScreen('screen-home');
-    } else {
-      showScreen('screen-onboarding');
-    }
+  if (!user) {
+    // Chưa có user → đăng nhập ẩn danh
+    try { await signInAnonymously(auth); } catch(e) { console.error(e); }
+    return; // onAuthStateChanged sẽ gọi lại sau khi sign-in xong
+  }
+
+  currentUser = user;
+  const snap = await getDoc(doc(db, 'users', user.uid));
+  if (snap.exists()) {
+    userProfile = snap.data();
+    renderHome();
+    showScreen('screen-home');
   } else {
-    signInAnonymously(auth);
     showScreen('screen-onboarding');
   }
 });
 
 /* ═══════════════════════════════════════════
-   ONBOARDING
+   AVATAR — upload ảnh + nén + fallback emoji
 ═══════════════════════════════════════════ */
-let avatarDataURL = null;
+const DEFAULT_AVATARS = ['🐣','🦊','🐼','🐨','🦁','🐸','🐧','🦋','🐙','🦄','🐳','🌸'];
+let avatarDataURL    = null;  // base64 ảnh upload (đã nén)
+let selectedEmoji    = '🐣'; // emoji chọn
 
+// render lưới emoji mặc định
+function renderDefaultAvatars() {
+  const grid = document.getElementById('default-avatar-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  DEFAULT_AVATARS.forEach(em => {
+    const btn = document.createElement('button');
+    btn.className = 'emoji-av-btn';
+    btn.textContent = em;
+    btn.title = em;
+    btn.addEventListener('click', () => {
+      avatarDataURL = null; // huỷ ảnh upload nếu có
+      selectedEmoji = em;
+      document.getElementById('avatar-preview-img').style.display = 'none';
+      document.getElementById('avatar-preview-placeholder').style.display = 'flex';
+      document.getElementById('avatar-preview-placeholder').textContent = em;
+      document.querySelectorAll('.emoji-av-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+    grid.appendChild(btn);
+  });
+}
+renderDefaultAvatars();
+
+// click vùng avatar → mở file picker
 document.getElementById('avatar-picker-btn').addEventListener('click', () => {
   document.getElementById('avatar-file-input').click();
 });
 
+// chọn file → nén → preview
 document.getElementById('avatar-file-input').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    avatarDataURL = ev.target.result;
-    document.getElementById('avatar-preview-img').src = avatarDataURL;
-    document.getElementById('avatar-preview-img').style.display = 'block';
-    document.getElementById('avatar-preview-placeholder').style.display = 'none';
+    // nén ảnh xuống max 200x200, quality 0.7 → ~30-60KB
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 200;
+      const canvas = document.createElement('canvas');
+      const scale  = Math.min(MAX / img.width, MAX / img.height, 1);
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      avatarDataURL = canvas.toDataURL('image/jpeg', 0.7);
+      selectedEmoji = null;
+      document.getElementById('avatar-preview-img').src = avatarDataURL;
+      document.getElementById('avatar-preview-img').style.display = 'block';
+      document.getElementById('avatar-preview-placeholder').style.display = 'none';
+      document.querySelectorAll('.emoji-av-btn').forEach(b => b.classList.remove('selected'));
+    };
+    img.src = ev.target.result;
   };
   reader.readAsDataURL(file);
 });
@@ -660,17 +736,8 @@ document.getElementById('btn-start').addEventListener('click', async () => {
   btn.textContent = 'Đang lưu...'; btn.disabled = true;
 
   try {
-    let avatarURL = null;
-
-    // Upload avatar if chosen
-    if (avatarDataURL) {
-      // convert dataURL → blob
-      const res  = await fetch(avatarDataURL);
-      const blob = await res.blob();
-      const ref  = storageRef(storage, `avatars/${currentUser.uid}`);
-      await uploadBytes(ref, blob);
-      avatarURL = await getDownloadURL(ref);
-    }
+    // avatarURL = base64 ảnh nén | emoji | null
+    const avatarURL = avatarDataURL || selectedEmoji || '🐣';
 
     userProfile = { uid: currentUser.uid, name, avatarURL, rooms: [], createdAt: new Date() };
     await setDoc(doc(db, 'users', currentUser.uid), userProfile);
