@@ -351,6 +351,158 @@
       .room-sidebar { width:100%; min-width:unset; height:auto; border-right:none; border-bottom:2px solid var(--border); }
       .calendar-wrap { max-height:280px; }
     }
+
+    /* ── CHAT ── */
+    .chat-section {
+      display:flex; flex-direction:column;
+      border-top:2px solid var(--border); background:var(--card);
+      height:260px; min-height:180px; flex-shrink:0;
+    }
+    .chat-header {
+      padding:8px 16px; font-size:11px; font-weight:800;
+      letter-spacing:.07em; text-transform:uppercase;
+      color:var(--muted); border-bottom:1px solid var(--border);
+      flex-shrink:0;
+    }
+    .chat-messages {
+      flex:1; overflow-y:auto; padding:10px 14px;
+      display:flex; flex-direction:column; gap:6px;
+    }
+    .chat-messages::-webkit-scrollbar { width:4px; }
+    .chat-messages::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+    .chat-msg {
+      display:flex; gap:8px; align-items:flex-end; max-width:90%;
+    }
+    .chat-msg.me { align-self:flex-end; flex-direction:row-reverse; }
+    .chat-msg-av {
+      width:26px; height:26px; border-radius:50%; flex-shrink:0;
+      background:#e8f5e9; display:flex; align-items:center;
+      justify-content:center; font-size:13px; border:1.5px solid var(--border);
+      overflow:hidden;
+    }
+    .chat-msg-av img { width:100%; height:100%; object-fit:cover; }
+    .chat-bubble {
+      padding:8px 12px; border-radius:16px; font-size:13px;
+      font-weight:700; line-height:1.45; word-break:break-word;
+      max-width:100%;
+    }
+    .chat-msg:not(.me) .chat-bubble {
+      background:#f0fdf4; border:1.5px solid var(--border);
+      border-bottom-left-radius:4px; color:var(--text);
+    }
+    .chat-msg.me .chat-bubble {
+      background:var(--green); color:#fff;
+      border-bottom-right-radius:4px;
+    }
+    .chat-msg-name {
+      font-size:10px; color:var(--muted); font-weight:800;
+      margin-bottom:2px; padding-left:2px;
+    }
+    .chat-msg-wrap { display:flex; flex-direction:column; max-width:220px; }
+    .chat-msg.me .chat-msg-wrap { align-items:flex-end; }
+    .chat-msg-time {
+      font-size:10px; color:var(--muted); font-weight:600;
+      margin-top:2px; padding:0 2px;
+    }
+    /* file/image in chat */
+    .chat-file-link {
+      display:flex; align-items:center; gap:6px;
+      background:rgba(0,0,0,.07); border-radius:10px;
+      padding:7px 10px; font-size:12px; font-weight:800;
+      text-decoration:none; color:inherit;
+    }
+    .chat-msg.me .chat-file-link { color:#fff; background:rgba(255,255,255,.2); }
+    .chat-img-preview {
+      max-width:160px; max-height:160px; border-radius:10px;
+      object-fit:cover; display:block; cursor:pointer;
+    }
+    /* Input bar */
+    .chat-input-bar {
+      display:flex; align-items:center; gap:8px;
+      padding:8px 12px; border-top:1px solid var(--border); flex-shrink:0;
+    }
+    .chat-plus-btn {
+      width:34px; height:34px; border-radius:50%; border:2px solid var(--border);
+      background:#f0fdf4; font-size:18px; cursor:pointer; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+      transition:border-color .15s, background .15s;
+    }
+    .chat-plus-btn:hover { border-color:var(--green); background:var(--green-l); }
+    .chat-text-input {
+      flex:1; padding:8px 12px; border:2px solid var(--border);
+      border-radius:20px; font-family:'Nunito',sans-serif;
+      font-size:13px; font-weight:700; color:var(--text);
+      background:#fff; outline:none; resize:none; line-height:1.4;
+      transition:border .2s; max-height:80px; overflow-y:auto;
+    }
+    .chat-text-input:focus { border-color:var(--green); }
+    .chat-send-btn {
+      width:34px; height:34px; border-radius:50%; border:none;
+      background:var(--green); color:#fff; font-size:16px;
+      cursor:pointer; flex-shrink:0; display:flex;
+      align-items:center; justify-content:center;
+      transition:background .15s; box-shadow:0 2px 0 var(--green-d);
+    }
+    .chat-send-btn:hover { background:var(--green-d); }
+    /* Plus menu popup */
+    .chat-plus-menu {
+      display:none; position:absolute; bottom:calc(100% + 8px); left:0;
+      background:#fff; border:2px solid var(--border); border-radius:16px;
+      padding:8px; min-width:170px;
+      box-shadow:0 8px 24px rgba(0,0,0,.1); z-index:50;
+    }
+    .chat-plus-menu.open { display:block; }
+    .chat-plus-menu button {
+      display:flex; align-items:center; gap:10px;
+      width:100%; padding:10px 12px; border:none; background:none;
+      font-family:'Nunito',sans-serif; font-size:13px; font-weight:700;
+      cursor:pointer; border-radius:10px; color:var(--text);
+      transition:background .15s;
+    }
+    .chat-plus-menu button:hover { background:#f0fdf4; color:var(--green-d); }
+    .chat-plus-wrap { position:relative; }
+    /* Emoji picker */
+    .emoji-picker {
+      display:none; position:absolute; bottom:calc(100% + 8px); left:0;
+      background:#fff; border:2px solid var(--border); border-radius:16px;
+      padding:12px; width:260px; box-shadow:0 8px 24px rgba(0,0,0,.1); z-index:50;
+    }
+    .emoji-picker.open { display:block; }
+    .emoji-picker-grid {
+      display:grid; grid-template-columns:repeat(8,1fr); gap:4px;
+    }
+    .ep-btn {
+      aspect-ratio:1; font-size:20px; border:none; background:none;
+      cursor:pointer; border-radius:8px; transition:background .1s;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .ep-btn:hover { background:#f0fdf4; }
+    /* Sticker picker */
+    .sticker-picker {
+      display:none; position:absolute; bottom:calc(100% + 8px); left:0;
+      background:#fff; border:2px solid var(--border); border-radius:16px;
+      padding:12px; width:260px; box-shadow:0 8px 24px rgba(0,0,0,.1); z-index:50;
+    }
+    .sticker-picker.open { display:block; }
+    .sticker-grid {
+      display:grid; grid-template-columns:repeat(4,1fr); gap:8px;
+    }
+    .sticker-btn {
+      aspect-ratio:1; font-size:32px; border:none; background:#f9fffe;
+      cursor:pointer; border-radius:12px; transition:background .1s;
+      display:flex; align-items:center; justify-content:center;
+      border:2px solid transparent;
+    }
+    .sticker-btn:hover { background:#f0fdf4; border-color:var(--green); }
+    /* System msg */
+    .chat-system { text-align:center; font-size:11px; color:var(--muted); font-weight:700; padding:2px 0; }
+    /* Image lightbox */
+    .lightbox {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.85);
+      z-index:999; align-items:center; justify-content:center; cursor:pointer;
+    }
+    .lightbox.open { display:flex; }
+    .lightbox img { max-width:90vw; max-height:90vh; border-radius:12px; object-fit:contain; }
   </style>
 </head>
 <body>
@@ -441,6 +593,29 @@
         <div id="day-detail-body"></div>
       </div>
     </div>
+
+    <!-- CHAT -->
+    <div class="chat-section">
+      <div class="chat-header">💬 Phòng chat</div>
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-input-bar">
+        <div class="chat-plus-wrap">
+          <button class="chat-plus-btn" id="chat-plus-btn" title="Thêm">＋</button>
+          <div class="chat-plus-menu" id="chat-plus-menu">
+            <button id="chat-attach-btn">📎 Gửi tệp / ảnh / video</button>
+            <button id="chat-sticker-btn">🎭 Sticker</button>
+            <button id="chat-emoji-btn">😊 Emoji</button>
+          </div>
+          <div class="sticker-picker" id="sticker-picker"></div>
+          <div class="emoji-picker" id="emoji-picker">
+            <div class="emoji-picker-grid" id="emoji-picker-grid"></div>
+          </div>
+        </div>
+        <input type="file" id="chat-file-input" accept="*/*" style="display:none" multiple />
+        <textarea class="chat-text-input" id="chat-text-input" rows="1" placeholder="Nhắn gì đó..."></textarea>
+        <button class="chat-send-btn" id="chat-send-btn">➤</button>
+      </div>
+    </div>
   </div>
 
   <!-- RIGHT: main -->
@@ -516,6 +691,9 @@
   </div>
 </div>
 
+<!-- lightbox -->
+<div class="lightbox" id="lightbox"><img id="lightbox-img" src="" alt="" /></div>
+
 <div class="toast" id="toast"></div>
 
 <!-- ══════════════════════ FIREBASE + LOGIC ══════════════════════ -->
@@ -524,7 +702,8 @@ import { initializeApp }    from "https://www.gstatic.com/firebasejs/10.12.0/fir
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
                              from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot,
-         collection, arrayUnion, serverTimestamp, increment }
+         collection, addDoc, query, orderBy, limit,
+         arrayUnion, serverTimestamp, increment }
                              from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -544,13 +723,14 @@ const db   = getFirestore(app);
 let currentUser   = null;
 let userProfile   = null;
 let currentRoomId = null;
-let roomMembers   = {};        // uid → profile
-let roomUnsub     = null;      // firestore listener unsub
-let clockInterval = null;      // my local clock interval
-let mySeconds     = 0;         // seconds ticked today (local)
+let roomMembers   = {};
+let roomUnsub     = null;
+let chatUnsub     = null;
+let clockInterval = null;
+let mySeconds     = 0;
 let isRunning     = false;
-let calYear, calMonth;         // calendar display state
-let studyData     = {};        // { 'YYYY-MM-DD': { uid: seconds } }
+let calYear, calMonth;
+let studyData     = {};
 
 /* ── HELPERS ── */
 function showScreen(id) {
@@ -609,8 +789,12 @@ document.getElementById('btn-google-login').addEventListener('click', async () =
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    // Chưa đăng nhập → hiện màn hình Login
     showScreen('screen-login');
+    return;
+  }
+  // Nếu là anonymous user (session cũ trước khi có Google Login) → đăng xuất ngay
+  if (user.isAnonymous) {
+    await signOut(auth);
     return;
   }
   currentUser = user;
@@ -619,15 +803,9 @@ onAuthStateChanged(auth, async (user) => {
     userProfile = snap.data();
     renderHome(); showScreen('screen-home');
   } else {
-    // Đăng nhập lần đầu → onboarding đặt tên + avatar
-    // Pre-fill tên từ Google nếu có
     const googleName = user.displayName || '';
     document.getElementById('username-input').value = googleName;
-    // Pre-set avatar từ Google photo nếu có
-    if (user.photoURL) {
-      // Dùng emoji mặc định thay vì fetch ảnh Google (tránh CORS)
-      selectedEmoji = '🐣'; avatarDataURL = null;
-    }
+    selectedEmoji = '🐣'; avatarDataURL = null;
     showScreen('screen-onboarding');
   }
 });
@@ -838,6 +1016,7 @@ async function enterRoom(roomId, roomName) {
   calYear=now.getFullYear(); calMonth=now.getMonth();
   renderCalendar();
   renderClocks();
+  initChat(roomId);
 }
 
 /* ══════════════════════════════════════════
@@ -1088,10 +1267,10 @@ document.getElementById('btn-cancel-editname').addEventListener('click',()=>clos
 async function doLogout() {
   stopClock(false);
   if (roomUnsub) { roomUnsub(); roomUnsub=null; }
+  if (chatUnsub) { chatUnsub(); chatUnsub=null; }
   currentUser=null; userProfile=null; currentRoomId=null; roomMembers={};
   document.getElementById('user-menu').classList.remove('open');
   await signOut(auth);
-  // onAuthStateChanged sẽ tự chuyển về screen-login
 }
 document.getElementById('menu-logout').addEventListener('click', doLogout);
 document.getElementById('btn-save-editname').addEventListener('click', async ()=>{
@@ -1105,6 +1284,222 @@ document.getElementById('btn-save-editname').addEventListener('click', async ()=
     renderClocks();
     closeModal('modal-editname'); toast('Đã đổi tên thành "'+newName+'"! ✅');
   } catch(err) { toast('Lỗi: '+err.message); }
+});
+
+/* ══════════════════════════════════════════
+   CHAT
+══════════════════════════════════════════ */
+const EMOJIS = ['😀','😂','🥰','😎','🤔','😅','🥹','😭','🔥','❤️','👍','👏',
+  '🎉','✨','💪','🙏','😤','🤩','😴','🥳','💀','😱','🫡','🤝',
+  '🐣','🦊','🐼','🌸','🌈','☀️','⭐','🎯'];
+const STICKERS = ['🎉','🔥','💯','👑','🚀','💎','🌟','✅','💪','🏆','🎊','❤️',
+  '😂','🥳','😤','🤩','👏','🙌','💫','🌈','⚡','🎁','🌺','🦁'];
+
+function initChat(roomId) {
+  if (chatUnsub) { chatUnsub(); chatUnsub=null; }
+  const messagesEl = document.getElementById('chat-messages');
+  messagesEl.innerHTML = '';
+
+  const chatQ = query(
+    collection(db,'rooms',roomId,'messages'),
+    orderBy('ts'), limit(200)
+  );
+  chatUnsub = onSnapshot(chatQ, snap => {
+    snap.docChanges().forEach(change => {
+      if (change.type === 'added') renderChatMsg(change.doc.data(), change.doc.id);
+    });
+    setTimeout(()=>{ messagesEl.scrollTop = messagesEl.scrollHeight; }, 50);
+  });
+
+  // Build emoji picker
+  const epGrid = document.getElementById('emoji-picker-grid');
+  if (!epGrid.children.length) {
+    EMOJIS.forEach(em => {
+      const b = document.createElement('button');
+      b.className='ep-btn'; b.textContent=em;
+      b.addEventListener('click', ()=>{ insertEmoji(em); closeAllPickers(); });
+      epGrid.appendChild(b);
+    });
+  }
+
+  // Build sticker picker
+  const sp = document.getElementById('sticker-picker');
+  if (!sp.children.length) {
+    const grid = document.createElement('div'); grid.className='sticker-grid';
+    STICKERS.forEach(s => {
+      const b = document.createElement('button');
+      b.className='sticker-btn'; b.textContent=s;
+      b.addEventListener('click', ()=>{ sendMessage({type:'sticker',content:s}); closeAllPickers(); });
+      grid.appendChild(b);
+    });
+    sp.appendChild(grid);
+  }
+}
+
+function closeAllPickers() {
+  document.getElementById('chat-plus-menu').classList.remove('open');
+  document.getElementById('sticker-picker').classList.remove('open');
+  document.getElementById('emoji-picker').classList.remove('open');
+}
+
+document.getElementById('chat-plus-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  const menu = document.getElementById('chat-plus-menu');
+  const isOpen = menu.classList.contains('open');
+  closeAllPickers();
+  if (!isOpen) menu.classList.add('open');
+});
+
+document.getElementById('chat-sticker-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('chat-plus-menu').classList.remove('open');
+  document.getElementById('sticker-picker').classList.toggle('open');
+});
+
+document.getElementById('chat-emoji-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('chat-plus-menu').classList.remove('open');
+  document.getElementById('emoji-picker').classList.toggle('open');
+});
+
+document.getElementById('chat-attach-btn').addEventListener('click', () => {
+  closeAllPickers();
+  document.getElementById('chat-file-input').click();
+});
+
+document.addEventListener('click', e => {
+  const plusWrap = document.querySelector('.chat-plus-wrap');
+  if (plusWrap && !plusWrap.contains(e.target)) closeAllPickers();
+});
+
+document.getElementById('chat-file-input').addEventListener('change', async e => {
+  const files = Array.from(e.target.files);
+  e.target.value='';
+  for (const file of files) {
+    const isImg = file.type.startsWith('image/');
+    const isVid = file.type.startsWith('video/');
+    if (file.size > 2*1024*1024) { toast('File "'+file.name+'" quá lớn (tối đa 2MB) 😊'); continue; }
+    const b64 = await fileToBase64(file);
+    const type = isImg ? 'image' : isVid ? 'video' : 'file';
+    await sendMessage({ type, content: b64, fileName: file.name, fileType: file.type });
+  }
+});
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = ev => res(ev.target.result);
+    r.onerror = () => rej(new Error('Lỗi đọc file'));
+    r.readAsDataURL(file);
+  });
+}
+
+function insertEmoji(em) {
+  const inp = document.getElementById('chat-text-input');
+  const pos = inp.selectionStart;
+  inp.value = inp.value.slice(0,pos) + em + inp.value.slice(inp.selectionEnd);
+  inp.focus();
+  inp.setSelectionRange(pos+em.length, pos+em.length);
+}
+
+document.getElementById('chat-send-btn').addEventListener('click', sendText);
+document.getElementById('chat-text-input').addEventListener('keydown', e => {
+  if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendText(); }
+});
+
+async function sendText() {
+  const inp = document.getElementById('chat-text-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value='';
+  await sendMessage({ type:'text', content: text });
+}
+
+async function sendMessage(msg) {
+  if (!currentRoomId || !currentUser) return;
+  try {
+    await addDoc(collection(db,'rooms',currentRoomId,'messages'), {
+      ...msg, uid: currentUser.uid, ts: serverTimestamp()
+    });
+  } catch(err) { toast('Lỗi gửi tin: '+err.message); }
+}
+
+function renderChatMsg(data, id) {
+  const messagesEl = document.getElementById('chat-messages');
+  if (document.getElementById('cmsg-'+id)) return;
+
+  const isMe = data.uid === currentUser?.uid;
+  const profile = roomMembers[data.uid] || { name:'Bạn', avatarURL:'🐣' };
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'chat-msg' + (isMe?' me':'');
+  wrapper.id = 'cmsg-'+id;
+
+  const avEl = document.createElement('div');
+  avEl.className = 'chat-msg-av';
+  if (profile.avatarURL?.startsWith('data:')) {
+    const img = document.createElement('img'); img.src=profile.avatarURL; avEl.appendChild(img);
+  } else { avEl.textContent = profile.avatarURL||'🐣'; }
+
+  const msgWrap = document.createElement('div');
+  msgWrap.className = 'chat-msg-wrap';
+
+  if (!isMe) {
+    const nameEl = document.createElement('div');
+    nameEl.className='chat-msg-name'; nameEl.textContent=profile.name;
+    msgWrap.appendChild(nameEl);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+
+  if (data.type==='text') {
+    bubble.textContent = data.content;
+  } else if (data.type==='sticker') {
+    bubble.style.cssText='background:none;border:none;font-size:42px;padding:4px;box-shadow:none;';
+    bubble.textContent = data.content;
+  } else if (data.type==='image') {
+    const img = document.createElement('img');
+    img.src=data.content; img.className='chat-img-preview';
+    img.addEventListener('click', ()=>{
+      document.getElementById('lightbox-img').src=data.content;
+      document.getElementById('lightbox').classList.add('open');
+    });
+    bubble.style.cssText='background:none;border:none;padding:2px;box-shadow:none;';
+    bubble.appendChild(img);
+  } else if (data.type==='video') {
+    const vid = document.createElement('video');
+    vid.src=data.content; vid.controls=true;
+    vid.style.cssText='max-width:160px;border-radius:10px;display:block;';
+    bubble.style.cssText='background:none;border:none;padding:2px;box-shadow:none;';
+    bubble.appendChild(vid);
+  } else if (data.type==='file') {
+    const a = document.createElement('a');
+    a.href=data.content; a.download=data.fileName||'file';
+    a.className='chat-file-link';
+    a.innerHTML='📎 <span>'+(data.fileName||'Tệp đính kèm')+'</span>';
+    bubble.appendChild(a);
+  }
+
+  msgWrap.appendChild(bubble);
+
+  if (data.ts) {
+    const timeEl = document.createElement('div');
+    timeEl.className='chat-msg-time';
+    try {
+      const d = data.ts.toDate();
+      timeEl.textContent = d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+    } catch(e) { timeEl.textContent=''; }
+    msgWrap.appendChild(timeEl);
+  }
+
+  wrapper.appendChild(avEl);
+  wrapper.appendChild(msgWrap);
+  messagesEl.appendChild(wrapper);
+}
+
+document.getElementById('lightbox').addEventListener('click', ()=>{
+  document.getElementById('lightbox').classList.remove('open');
 });
 </script>
 </body>
