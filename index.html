@@ -5,39 +5,36 @@
     <title>Học tập cùng nhau</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Màu nền pastel nhẹ nhàng */
-        body { background-color: #f0fdfa; font-family: sans-serif; }
+        body { background-color: #f0fdfa; font-family: 'Segoe UI', sans-serif; }
+        .hidden-menu { display: none; }
     </style>
 </head>
 <body class="flex h-screen p-4 gap-4">
 
-    <div class="w-1/4 bg-white p-6 rounded-3xl shadow-lg">
-        <h2 class="font-bold text-emerald-800 text-lg mb-4">Lịch học</h2>
-        <div id="calendar" class="text-emerald-600">Hiển thị lịch tại đây</div>
+    <div class="w-1/4 bg-white p-6 rounded-3xl shadow-sm">
+        <h2 class="font-bold text-emerald-800 mb-4">Lịch học</h2>
     </div>
 
     <div class="w-2/4 flex flex-col gap-4">
-        <div class="bg-white p-8 rounded-3xl shadow-lg text-center">
-            <h1 class="text-2xl font-bold text-emerald-700 mb-4">Giờ học</h1>
-            <div id="display" class="text-6xl font-mono font-bold text-emerald-600 mb-6">00:00:00</div>
-            <button id="startBtn" class="w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold text-lg hover:bg-emerald-600 transition">
-                Bắt đầu học
-            </button>
+        <div class="bg-white p-8 rounded-3xl shadow-sm text-center">
+            <h1 class="text-xl font-bold text-emerald-700">Giờ học</h1>
+            <div id="display" class="text-5xl font-mono font-bold text-emerald-600 my-4">00:00:00</div>
+            <button id="startBtn" class="bg-emerald-500 text-white px-8 py-3 rounded-xl font-bold">▷ Bắt đầu học</button>
         </div>
-        <div class="flex-grow bg-emerald-100 rounded-3xl flex items-center justify-center border-2 border-dashed border-emerald-300">
-            <span class="text-emerald-700 font-medium">Màn hình video call</span>
-        </div>
+        <div class="flex-grow bg-emerald-900 rounded-3xl flex items-center justify-center text-white">Màn hình video call</div>
     </div>
 
     <div class="w-1/4 flex flex-col gap-4">
-        <div class="bg-white p-6 rounded-3xl shadow-lg text-center">
-            <div class="w-20 h-20 bg-emerald-200 rounded-full mx-auto mb-3"></div>
-            <p class="font-bold text-lg">Tên tài khoản</p>
+        <div class="relative bg-white p-4 rounded-3xl shadow-sm text-center">
+            <button id="avatarBtn" class="w-16 h-16 bg-emerald-200 rounded-full mx-auto"></button>
+            <p class="font-bold mt-2">Tên của bạn</p>
+            <div id="userMenu" class="hidden-menu absolute top-20 right-0 w-full bg-white shadow-xl rounded-2xl p-4 border">
+                <button class="block w-full py-2 hover:bg-emerald-50">Trang chủ</button>
+                <button class="block w-full py-2 hover:bg-emerald-50">Chỉnh sửa tên</button>
+            </div>
         </div>
-        <div class="flex-grow bg-white p-6 rounded-3xl shadow-lg flex flex-col">
-            <h2 class="font-bold text-emerald-800 text-lg mb-4">Phòng chat</h2>
-            <div class="flex-grow"></div>
-            <input type="text" placeholder="Message..." class="w-full p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+        <div class="flex-grow bg-white p-4 rounded-3xl shadow-sm">
+            <h2 class="font-bold text-emerald-800">Phòng chat</h2>
         </div>
     </div>
 
@@ -45,6 +42,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+        // CẤU HÌNH CỦA BẠN
         const firebaseConfig = {
             apiKey: "AIzaSyAEwXt2HFodIw426l_cmQ5Sk9QA185w8gA",
             authDomain: "studywithmeanytime-7a4c7.firebaseapp.com",
@@ -57,13 +55,19 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // Logic ẩn/hiện menu
+        document.getElementById('avatarBtn').addEventListener('click', () => {
+            document.getElementById('userMenu').classList.toggle('hidden-menu');
+        });
+
+        // Logic đồng hồ & Lưu Firebase
         let seconds = 0;
         let timer;
         const display = document.getElementById('display');
         const startBtn = document.getElementById('startBtn');
 
         startBtn.addEventListener('click', async () => {
-            if (startBtn.innerText === 'Bắt đầu học') {
+            if (startBtn.innerText === '▷ Bắt đầu học') {
                 timer = setInterval(() => {
                     seconds++;
                     let hrs = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -71,7 +75,7 @@
                     let secs = (seconds % 60).toString().padStart(2, '0');
                     display.innerText = `${hrs}:${mins}:${secs}`;
                 }, 1000);
-                startBtn.innerText = 'Dừng học';
+                startBtn.innerText = '▯▯ Dừng học';
                 startBtn.classList.replace('bg-emerald-500', 'bg-red-500');
             } else {
                 clearInterval(timer);
@@ -80,11 +84,10 @@
                         totalSeconds: seconds,
                         createdAt: new Date()
                     });
-                    alert("Đã lưu thành công " + seconds + " giây học tập!");
-                } catch (e) {
-                    alert("Lỗi lưu dữ liệu: " + e.message);
-                }
-                startBtn.innerText = 'Bắt đầu học';
+                    alert("Đã lưu " + seconds + " giây!");
+                } catch (e) { alert("Lỗi: " + e.message); }
+                
+                startBtn.innerText = '▷ Bắt đầu học';
                 startBtn.classList.replace('bg-red-500', 'bg-emerald-500');
                 seconds = 0;
                 display.innerText = "00:00:00";
