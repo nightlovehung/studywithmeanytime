@@ -2078,7 +2078,7 @@ document.getElementById('reply-bar-close').addEventListener('click', ()=>{
   document.getElementById('reply-bar').classList.remove('open');
 });
 
-
+document.getElementById('btn-save-editname').addEventListener('click', async ()=>{
   const newName=document.getElementById('edit-name-input').value.trim();
   if (!newName) { toast('Tên không được để trống!'); return; }
   try {
