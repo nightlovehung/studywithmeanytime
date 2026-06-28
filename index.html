@@ -353,6 +353,94 @@
     }
     .toast.show { transform:translateX(-50%) translateY(0); }
 
+    /* ── NOTIFICATION SYSTEM ── */
+    #notif-container {
+      position:fixed; top:16px; right:16px; z-index:1100;
+      display:flex; flex-direction:column; gap:8px; pointer-events:none;
+      max-width:320px;
+    }
+    .notif-toast {
+      display:flex; align-items:flex-start; gap:10px;
+      padding:12px 14px; border-radius:14px;
+      font-family:'Nunito',sans-serif; font-size:13px; font-weight:700;
+      box-shadow:0 4px 20px rgba(0,0,0,.15); pointer-events:all;
+      transform:translateX(120%); opacity:0;
+      transition:transform .35s cubic-bezier(.34,1.56,.64,1), opacity .35s ease;
+      cursor:pointer; position:relative; min-width:220px;
+    }
+    .notif-toast.show { transform:translateX(0); opacity:1; }
+    .notif-toast.hide { transform:translateX(120%); opacity:0; }
+    .notif-toast.info    { background:#fff; border:2px solid var(--border); color:var(--text); }
+    .notif-toast.success { background:#f0fdf4; border:2px solid var(--theme); color:#2d7a00; }
+    .notif-toast.warning { background:#fff8f0; border:2px solid #FF9500; color:#a05a00; }
+    .notif-icon { font-size:18px; flex-shrink:0; margin-top:1px; }
+    .notif-body { flex:1; line-height:1.45; }
+    .notif-title { font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.06em; opacity:.7; margin-bottom:2px; }
+    .notif-close {
+      position:absolute; top:6px; right:8px;
+      background:none; border:none; cursor:pointer;
+      font-size:13px; opacity:.5; padding:2px;
+      font-family:'Nunito',sans-serif; color:inherit;
+    }
+    .notif-close:hover { opacity:1; }
+    @keyframes notifSlideIn { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
+    @media(max-width:700px) {
+      #notif-container { top:8px; right:8px; left:8px; max-width:none; }
+      .notif-toast { transform:translateY(-80px); }
+      .notif-toast.show { transform:translateY(0); }
+      .notif-toast.hide { transform:translateY(-80px); }
+    }
+
+    /* Notification history panel */
+    #notif-history-btn {
+      position:fixed; top:16px; left:50%; transform:translateX(-50%);
+      background:var(--card); border:2px solid var(--border);
+      border-radius:100px; padding:6px 14px 6px 10px;
+      font-family:'Nunito',sans-serif; font-size:12px; font-weight:800;
+      cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.1);
+      z-index:1050; display:none; align-items:center; gap:6px;
+      color:var(--text); transition:background .15s;
+    }
+    #notif-history-btn:hover { background:#f0fdf4; }
+    #notif-history-btn .notif-badge {
+      background:var(--red); color:#fff; border-radius:100px;
+      font-size:10px; padding:1px 6px; min-width:18px; text-align:center;
+    }
+    #notif-history-panel {
+      display:none; position:fixed; top:52px; left:50%; transform:translateX(-50%);
+      background:#fff; border:2px solid var(--border); border-radius:16px;
+      width:300px; max-height:340px; overflow-y:auto;
+      box-shadow:0 8px 28px rgba(0,0,0,.12); z-index:1060;
+      animation:popIn .2s cubic-bezier(.34,1.56,.64,1);
+    }
+    #notif-history-panel.open { display:block; }
+    .notif-history-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 14px 10px; border-bottom:1px solid var(--border);
+      font-size:12px; font-weight:900; color:var(--green-d);
+      text-transform:uppercase; letter-spacing:.06em;
+    }
+    .notif-history-header button {
+      background:none; border:none; cursor:pointer; font-size:11px;
+      font-family:'Nunito',sans-serif; font-weight:800; color:var(--muted);
+      padding:2px 6px; border-radius:6px;
+    }
+    .notif-history-header button:hover { background:#f0fdf4; color:var(--green-d); }
+    .notif-history-item {
+      display:flex; align-items:flex-start; gap:8px;
+      padding:9px 14px; border-bottom:1px solid #f5f5f5;
+      font-size:12px; color:var(--text);
+    }
+    .notif-history-item:last-child { border-bottom:none; }
+    .notif-history-item .hi-icon { font-size:14px; margin-top:1px; flex-shrink:0; }
+    .notif-history-item .hi-text { flex:1; line-height:1.4; font-weight:700; }
+    .notif-history-item .hi-time { font-size:10px; color:var(--muted); font-weight:800; margin-top:2px; }
+    .notif-history-empty { padding:20px; text-align:center; color:var(--muted); font-size:13px; font-weight:700; }
+    @media(max-width:700px) {
+      #notif-history-btn { top:auto; bottom:80px; left:auto; right:12px; transform:none; }
+      #notif-history-panel { top:auto; bottom:130px; left:auto; right:8px; transform:none; width:290px; }
+    }
+
     /* RESPONSIVE — mobile giữ layout ngang giống desktop, chỉ scale */
     @media(max-width:700px) {
       /* Room screen: giữ flex-row, sidebar thu nhỏ */
@@ -764,6 +852,21 @@
   </style>
 </head>
 <body>
+
+<!-- ══ NOTIFICATION SYSTEM ══ -->
+<div id="notif-container"></div>
+<button id="notif-history-btn" aria-label="Xem thông báo cũ">
+  🔔 <span id="notif-history-count" class="notif-badge">0</span> thông báo
+</button>
+<div id="notif-history-panel">
+  <div class="notif-history-header">
+    🗂 Lịch sử thông báo
+    <button id="notif-clear-btn">Xoá tất cả</button>
+  </div>
+  <div id="notif-history-list">
+    <div class="notif-history-empty">Chưa có thông báo nào 👋</div>
+  </div>
+</div>
 
 <!-- LOADING -->
 <div id="screen-loading">
@@ -1488,6 +1591,7 @@ async function enterRoom(roomId, roomName) {
   roomUnsub = onSnapshot(doc(db,'rooms',roomId), async snap=>{
     if (!snap.exists()) {
       // Phòng bị xóa
+      notify('Phòng học đã bị xóa bởi chủ phòng 😢', 'warning', '🗑️');
       toast('Phòng học đã bị xóa 😢');
       stopClock(false);
       showScreen('screen-home');
@@ -1499,6 +1603,7 @@ async function enterRoom(roomId, roomName) {
 
     // Phát hiện bị kick: currentUser không còn trong members
     if (!newMembers.includes(currentUser.uid)) {
+      notify('Bạn đã bị kick khỏi phòng 😢', 'warning', '🚫');
       toast('Bạn đã bị kick khỏi phòng 😢');
       stopClock(false);
       if (chatUnsub) { chatUnsub(); chatUnsub=null; }
@@ -1514,15 +1619,25 @@ async function enterRoom(roomId, roomName) {
     }
 
     // Load profile cho member mới chưa có
+    const prevUids = Object.keys(roomMembers);
     await Promise.all(newMembers.map(async uid=>{
       if (!roomMembers[uid]) {
         const s=await getDoc(doc(db,'users',uid));
-        if (s.exists()) roomMembers[uid]=s.data();
+        if (s.exists()) {
+          roomMembers[uid]=s.data();
+          if (uid !== currentUser.uid) {
+            notify(`${roomMembers[uid].name} vừa vào phòng 👋`, 'info', roomMembers[uid].avatarURL?.startsWith('data:') ? '🙂' : (roomMembers[uid].avatarURL || '🙂'));
+          }
+        }
       }
     }));
     // Xóa member đã rời/bị kick khỏi roomMembers
     Object.keys(roomMembers).forEach(uid=>{
-      if (!newMembers.includes(uid)) delete roomMembers[uid];
+      if (!newMembers.includes(uid)) {
+        const leftName = roomMembers[uid]?.name || 'Ai đó';
+        delete roomMembers[uid];
+        notify(`${leftName} đã rời phòng 🚪`, 'warning', '🚪');
+      }
     });
     renderClocks(); // Cập nhật đồng hồ + member count ngay
   });
@@ -1708,8 +1823,10 @@ async function stopClock(save) {
 
   if (save && currentUser && currentRoomId && totalSecs >= 900) {
     await addStudySeconds(totalSecs);
+    notify('Đã lưu ' + fmtTime(totalSecs) + ' vào lịch! 📅', 'success', '🗓️');
     toast('Đã lưu ' + fmtTime(totalSecs) + ' vào lịch! 📅');
   } else if (save && totalSecs > 0 && totalSecs < 900) {
+    notify('Cần học ít nhất 15 phút để điểm danh 😊', 'info', '⏱️');
     toast('Cần học ít nhất 15 phút để điểm danh 😊');
   }
   mySeconds = 0; lastAutoSaved = 0;
@@ -1735,7 +1852,9 @@ setInterval(async ()=>{
   const total = (cd.accumulated||0)+elapsed;
   if (total >= 900 && total > lastAutoSaved+60) {
     const delta = total - lastAutoSaved;
+    const isFirstMilestone = lastAutoSaved === 0;
     if (delta > 0) await addStudySeconds(delta);
+    if (isFirstMilestone) notify('Đã học đủ 15 phút — tô xanh lịch hôm nay! 🎉', 'success', '📅');
     lastAutoSaved = total;
   }
 }, 60000);
@@ -2496,6 +2615,7 @@ async function kickMember(uid, name) {
     await updateDoc(doc(db,'rooms',currentRoomId), { members: arrayRemove(uid) });
     await updateDoc(doc(db,'users',uid), { rooms: arrayRemove(currentRoomId) });
     delete roomMembers[uid];
+    notify(`Đã kick ${name} khỏi phòng 👋`, 'warning', '🚫');
     toast(`Đã kick ${name} 👋`); closeModal('modal-members');
   } catch(e) { toast('Lỗi: '+e.message); }
 }
@@ -2635,6 +2755,8 @@ function listenCall(roomId) {
 
     // Hiện popup cho người khác
     const caller = roomMembers[data.startedBy] || { name:'Bạn bè', avatarURL:'📹' };
+    const callerIcon = caller.avatarURL?.startsWith('data:') ? '📹' : (caller.avatarURL || '📹');
+    notify(`${caller.name} đang bắt đầu video call! 📹`, 'info', callerIcon, { dur: 8000 });
     const avEl = document.getElementById('incoming-caller-av');
     if (caller.avatarURL?.startsWith('data:')) {
       avEl.innerHTML = `<img src="${caller.avatarURL}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--theme);display:block;margin:0 auto">`;
@@ -2713,6 +2835,7 @@ async function joinCall() {
         const th = makeThumb(uid, profile, null, false);
         th.addEventListener('click', ()=>switchMain(uid));
         document.getElementById('call-strip').appendChild(th);
+        notify(`${profile.name || 'Ai đó'} vừa tham gia cuộc gọi 📹`, 'info', '📹');
         // Tạo WebRTC peer nếu chưa có
         if (!peerConns[uid]) {
           createPeer(uid, true); // mình là initiator với người vừa join
@@ -2724,8 +2847,10 @@ async function joinCall() {
     document.querySelectorAll('.call-thumb').forEach(th=>{
       const uid = th.id.replace('thumb-','');
       if (uid !== currentUser.uid && !parts[uid]) {
+        const leftProfile = roomMembers[uid];
         th.remove();
         if (peerConns[uid]) { peerConns[uid].close(); delete peerConns[uid]; }
+        if (leftProfile) notify(`${leftProfile.name} đã rời cuộc gọi`, 'warning', '📴');
       }
     });
 
@@ -2946,12 +3071,120 @@ document.getElementById('ctrl-flip').addEventListener('click', async ()=>{
 document.getElementById('ctrl-end').addEventListener('click', ()=>endCall(true));
 document.getElementById('btn-call-back').addEventListener('click', ()=>endCall(true));
 
-function updateCtrlBtns() {
-  document.getElementById('ctrl-mic').textContent = micOn?'🎙️':'🔇';
-  document.getElementById('ctrl-cam').textContent = camOn?'📷':'🚫';
-  document.getElementById('ctrl-mic').classList.toggle('off',!micOn);
-  document.getElementById('ctrl-cam').classList.toggle('off',!camOn);
+/* ══════════════════════════════════════════
+   NOTIFICATION SYSTEM
+   notify(msg, type, icon, opts)
+   type: 'info' | 'success' | 'warning'
+══════════════════════════════════════════ */
+const notifHistory = [];
+let notifHistoryOpen = false;
+
+const NOTIF_ICONS = { info:'💬', success:'✅', warning:'⚠️' };
+const NOTIF_LABELS = { info:'Info', success:'Tuyệt vời!', warning:'Chú ý' };
+const NOTIF_DURATION = { info:3500, success:4000, warning:5500 };
+
+function notify(msg, type='info', icon=null, opts={}) {
+  const container = document.getElementById('notif-container');
+  if (!container) return;
+
+  const actualIcon = icon || NOTIF_ICONS[type] || '💬';
+  const dur = opts.dur || NOTIF_DURATION[type];
+
+  // ── Add to history ──
+  const ts = new Date();
+  notifHistory.unshift({ msg, type, icon: actualIcon, ts });
+  if (notifHistory.length > 40) notifHistory.pop();
+  updateHistoryPanel();
+  updateHistoryBtn();
+
+  // ── Toast element ──
+  const el = document.createElement('div');
+  el.className = `notif-toast ${type}`;
+  el.innerHTML = `
+    <span class="notif-icon">${actualIcon}</span>
+    <div class="notif-body">
+      <div class="notif-title">${NOTIF_LABELS[type]}</div>
+      <div>${msg}</div>
+    </div>
+    <button class="notif-close" title="Đóng">✕</button>
+  `;
+
+  const closeBtn = el.querySelector('.notif-close');
+  function dismiss() {
+    el.classList.remove('show');
+    el.classList.add('hide');
+    setTimeout(() => el.remove(), 380);
+  }
+  closeBtn.addEventListener('click', e => { e.stopPropagation(); dismiss(); });
+  el.addEventListener('click', dismiss);
+
+  container.appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  setTimeout(dismiss, dur);
 }
+
+function updateHistoryBtn() {
+  const btn = document.getElementById('notif-history-btn');
+  const count = document.getElementById('notif-history-count');
+  if (!btn) return;
+  if (notifHistory.length > 0) {
+    btn.style.display = 'flex';
+    count.textContent = notifHistory.length > 99 ? '99+' : notifHistory.length;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function updateHistoryPanel() {
+  const list = document.getElementById('notif-history-list');
+  if (!list) return;
+  if (!notifHistory.length) {
+    list.innerHTML = '<div class="notif-history-empty">Chưa có thông báo nào 👋</div>';
+    return;
+  }
+  list.innerHTML = '';
+  notifHistory.forEach(n => {
+    const item = document.createElement('div');
+    item.className = 'notif-history-item';
+    const mins = Math.floor((Date.now() - n.ts) / 60000);
+    const timeStr = mins < 1 ? 'Vừa xong' : mins < 60 ? `${mins} phút trước` :
+      n.ts.getHours().toString().padStart(2,'0') + ':' + n.ts.getMinutes().toString().padStart(2,'0');
+    item.innerHTML = `
+      <span class="hi-icon">${n.icon}</span>
+      <div style="flex:1">
+        <div class="hi-text">${n.msg}</div>
+        <div class="hi-time">${timeStr}</div>
+      </div>`;
+    list.appendChild(item);
+  });
+}
+
+// Toggle history panel
+document.getElementById('notif-history-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  notifHistoryOpen = !notifHistoryOpen;
+  const panel = document.getElementById('notif-history-panel');
+  if (notifHistoryOpen) { updateHistoryPanel(); panel.classList.add('open'); }
+  else panel.classList.remove('open');
+});
+
+document.getElementById('notif-clear-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  notifHistory.length = 0;
+  updateHistoryPanel();
+  updateHistoryBtn();
+  document.getElementById('notif-history-panel').classList.remove('open');
+  notifHistoryOpen = false;
+});
+
+document.addEventListener('click', e => {
+  if (!document.getElementById('notif-history-btn').contains(e.target) &&
+      !document.getElementById('notif-history-panel').contains(e.target)) {
+    document.getElementById('notif-history-panel').classList.remove('open');
+    notifHistoryOpen = false;
+  }
+});
+
 </script>
 </body>
 </html>
