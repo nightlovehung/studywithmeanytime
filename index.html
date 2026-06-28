@@ -2102,207 +2102,285 @@ async function doDeleteRoom() {
 }
 
 /* ══════════════════════════════════════════
-   VIDEO CALL  (WebRTC + Firestore signaling)
-   Dùng participants/{uid} thay vì active boolean
-   → tự động hết hạn khi mọi người đều out
+   VIDEO CALL
+   Luồng:
+   1. Người gọi bấm → ghi vào call/invite {active,startedBy,ts}
+   2. Người khác thấy invite → popup Chấp nhận / Từ chối
+   3. Ai chấp nhận → ghi vào callParticipants/{uid} → join call thật
+   4. Khi end → xóa callParticipants/{uid} mình; nếu là initiator → xóa invite luôn
+   5. Cleanup: invite tự expire sau 60s (kiểm tra ts khi nhận)
 ══════════════════════════════════════════ */
 const ICE_SERVERS = { iceServers:[
   {urls:'stun:stun.l.google.com:19302'},
   {urls:'stun:stun1.l.google.com:19302'}
 ]};
 
-// Gọi khi vào phòng: lắng nghe participants để hiện incoming call
+let callInviteUnsub = null;  // listener invite
+let callPartUnsub   = null;  // listener participants (chỉ khi đang trong call)
+let facingMode      = 'user';
+
+// ── Gọi khi vào phòng: chỉ lắng nghe invite ──
 function listenCall(roomId) {
   if (callUnsub) { callUnsub(); callUnsub=null; }
-  callUnsub = onSnapshot(collection(db,'rooms',roomId,'callParticipants'), snap=>{
-    const participants = {};
-    snap.forEach(d=>{ participants[d.id]=d.data(); });
+  if (callInviteUnsub) { callInviteUnsub(); callInviteUnsub=null; }
 
-    const inCall = document.getElementById('screen-call').classList.contains('active');
+  callInviteUnsub = onSnapshot(doc(db,'rooms',roomId,'call','invite'), snap=>{
     const incoming = document.getElementById('call-incoming');
+    const inCall   = document.getElementById('screen-call').classList.contains('active');
+    if (inCall) return; // đang trong call → bỏ qua invite
 
-    // Không có ai đang gọi → ẩn overlay
-    const othersInCall = Object.entries(participants).filter(([uid])=>uid!==currentUser?.uid);
-    if (othersInCall.length === 0) {
+    if (!snap.exists() || !snap.data().active) {
       incoming.classList.remove('active');
-      // Nếu đang trong call mà không còn ai → tự end
-      if (inCall && Object.keys(participants).length === 0) endCall(false);
       return;
     }
 
-    // Có người khác đang call, mình chưa trong call → hiện incoming
-    if (!inCall) {
-      const [callerUid, callerData] = othersInCall[0];
-      const caller = roomMembers[callerUid] || callerData;
-      const avEl = document.getElementById('incoming-caller-av');
-      if (caller?.avatarURL?.startsWith('data:')) {
-        avEl.innerHTML = `<img src="${caller.avatarURL}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--green);display:block;margin:0 auto">`;
-        avEl.style.fontSize = '0';
-      } else {
-        avEl.innerHTML = '';
-        avEl.textContent = caller?.avatarURL || '📹';
-        avEl.style.fontSize = '';
+    const data = snap.data();
+    // Stale check: nếu invite cũ hơn 60s thì bỏ qua
+    if (data.ts) {
+      const age = (Date.now() - data.ts.toMillis()) / 1000;
+      if (age > 60) {
+        incoming.classList.remove('active');
+        return;
       }
-      document.getElementById('incoming-caller-name').textContent = caller?.name || 'Bạn bè';
-      incoming.classList.add('active');
     }
 
-    // Nếu đang trong call → cập nhật strip (ai vào/ra)
-    if (inCall) {
-      // Xóa thumb của người đã out
-      document.querySelectorAll('.call-thumb').forEach(th=>{
-        const uid = th.id.replace('thumb-','');
-        if (uid !== currentUser.uid && !participants[uid]) th.remove();
-      });
+    // Chính người gọi → không hiện popup cho mình
+    if (data.startedBy === currentUser.uid) return;
+
+    // Hiện popup cho người khác
+    const caller = roomMembers[data.startedBy] || { name:'Bạn bè', avatarURL:'📹' };
+    const avEl = document.getElementById('incoming-caller-av');
+    if (caller.avatarURL?.startsWith('data:')) {
+      avEl.innerHTML = `<img src="${caller.avatarURL}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--green);display:block;margin:0 auto">`;
+      avEl.style.fontSize = '0';
+    } else {
+      avEl.innerHTML = '';
+      avEl.textContent = caller.avatarURL || '📹';
+      avEl.style.fontSize = '';
     }
+    document.getElementById('incoming-caller-name').textContent = caller.name;
+    incoming.classList.add('active');
   });
 }
 
-document.getElementById('video-placeholder').addEventListener('click', ()=> startCall(true));
-document.getElementById('btn-accept-call').addEventListener('click', ()=>{
-  document.getElementById('call-incoming').classList.remove('active');
-  startCall(false);
+// ── Bấm vào video placeholder → gửi invite, tự vào call ──
+document.getElementById('video-placeholder').addEventListener('click', async ()=>{
+  // Ghi invite lên Firestore (không ghi participants trước)
+  await setDoc(doc(db,'rooms',currentRoomId,'call','invite'),{
+    active: true, startedBy: currentUser.uid, ts: serverTimestamp()
+  });
+  // Người gọi tự join luôn
+  await joinCall();
 });
+
+document.getElementById('btn-accept-call').addEventListener('click', async ()=>{
+  document.getElementById('call-incoming').classList.remove('active');
+  await joinCall();
+});
+
 document.getElementById('btn-decline-call').addEventListener('click', ()=>{
   document.getElementById('call-incoming').classList.remove('active');
   toast('Đã từ chối cuộc gọi');
 });
 
-async function startCall(initiator) {
+// ── joinCall: xin media → ghi participants → hiện UI ──
+async function joinCall() {
+  // Lấy stream
   try { localStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true }); }
   catch(e) {
     try { localStream = await navigator.mediaDevices.getUserMedia({ video:false, audio:true }); }
     catch(e2) { toast('Không thể truy cập camera/mic 😔'); return; }
   }
 
-  // Detect nhiều camera → hiện nút flip
+  // Detect flip camera
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
-    const cameras = devices.filter(d=>d.kind==='videoinput');
+    const cameras  = devices.filter(d => d.kind === 'videoinput');
     document.getElementById('ctrl-flip').style.display = cameras.length > 1 ? '' : 'none';
-  } catch(e) { document.getElementById('ctrl-flip').style.display = 'none'; }
+  } catch(e) {
+    document.getElementById('ctrl-flip').style.display = 'none';
+  }
 
   // Ghi mình vào participants
   await setDoc(doc(db,'rooms',currentRoomId,'callParticipants',currentUser.uid),{
-    uid: currentUser.uid,
-    name: userProfile.name,
-    avatarURL: userProfile.avatarURL,
-    joinedAt: serverTimestamp()
+    uid: currentUser.uid, name: userProfile.name,
+    avatarURL: userProfile.avatarURL, joinedAt: serverTimestamp()
   });
 
-  micOn=true; camOn=true; updateCtrlBtns();
+  micOn=true; camOn=true; facingMode='user'; updateCtrlBtns();
   document.getElementById('screen-call').classList.add('active');
-  document.getElementById('call-room-name').textContent = currentRoomData?.name||'Phòng học';
+  document.getElementById('call-room-name').textContent = currentRoomData?.name || 'Phòng học';
   showLocalInMain();
-  renderCallStrip();
-  const others = Object.keys(roomMembers).filter(u=>u!==currentUser.uid);
-  for (const uid of others) await createPeer(uid, initiator);
+  renderCallStrip(); // ban đầu chỉ có mình
+
+  // Lắng nghe participants để cập nhật strip realtime
+  if (callPartUnsub) { callPartUnsub(); callPartUnsub=null; }
+  callPartUnsub = onSnapshot(collection(db,'rooms',currentRoomId,'callParticipants'), snap=>{
+    const parts = {};
+    snap.forEach(d => { parts[d.id] = d.data(); });
+
+    // Thêm thumb người mới join (chưa có trong strip)
+    Object.entries(parts).forEach(([uid, data])=>{
+      if (uid === currentUser.uid) return; // bản thân đã có
+      if (!document.getElementById('thumb-'+uid)) {
+        const profile = roomMembers[uid] || data;
+        const th = makeThumb(uid, profile, null, false);
+        th.addEventListener('click', ()=>switchMain(uid));
+        document.getElementById('call-strip').appendChild(th);
+        // Tạo WebRTC peer nếu chưa có
+        if (!peerConns[uid]) {
+          createPeer(uid, true); // mình là initiator với người vừa join
+        }
+      }
+    });
+
+    // Xóa thumb người đã out
+    document.querySelectorAll('.call-thumb').forEach(th=>{
+      const uid = th.id.replace('thumb-','');
+      if (uid !== currentUser.uid && !parts[uid]) {
+        th.remove();
+        if (peerConns[uid]) { peerConns[uid].close(); delete peerConns[uid]; }
+      }
+    });
+
+    // Không còn ai ngoài mình → thông báo rồi end
+    const others = Object.keys(parts).filter(u => u !== currentUser.uid);
+    if (others.length === 0 && document.querySelectorAll('.call-thumb').length <= 1) {
+      // Chỉ còn mình, không end tự động — để người dùng tự end
+    }
+  });
+
   listenSignal();
 }
 
-// endCall(notify=true): notify=false khi bị gọi tự động (room bị xóa, v.v.)
-function endCall(notify=true) {
+// ── endCall ──
+async function endCall(notify=true) {
+  if (callPartUnsub) { callPartUnsub(); callPartUnsub=null; }
   if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
   Object.values(peerConns).forEach(pc=>pc.close()); peerConns={};
   document.getElementById('screen-call').classList.remove('active');
   document.getElementById('call-incoming').classList.remove('active');
-  // Xóa mình khỏi participants → người khác sẽ thấy ngay
-  if (currentRoomId && currentUser && notify) {
-    deleteDoc(doc(db,'rooms',currentRoomId,'callParticipants',currentUser.uid)).catch(()=>{});
-  }
+
+  if (!notify || !currentRoomId || !currentUser) return;
+
+  // Xóa mình khỏi participants
+  await deleteDoc(doc(db,'rooms',currentRoomId,'callParticipants',currentUser.uid)).catch(()=>{});
+
+  // Nếu mình là initiator (người gọi) → deactivate invite
+  // (hoặc khi không còn ai trong call → invite tự hết hiệu lực)
+  try {
+    const partSnap = await getDoc(doc(db,'rooms',currentRoomId,'callParticipants',currentUser.uid)).catch(()=>null);
+    const inviteSnap = await getDoc(doc(db,'rooms',currentRoomId,'call','invite'));
+    if (inviteSnap.exists() && inviteSnap.data().startedBy === currentUser.uid) {
+      await setDoc(doc(db,'rooms',currentRoomId,'call','invite'),{ active:false },{ merge:true });
+    }
+  } catch(e) {}
 }
 
 function showLocalInMain() {
   const mv=document.getElementById('main-video-el');
   const ph=document.getElementById('main-video-placeholder');
   if (localStream && camOn) {
-    mv.srcObject=localStream; mv.style.display='block'; ph.style.display='none';
+    mv.srcObject=localStream; mv.muted=true; mv.style.display='block'; ph.style.display='none';
   } else {
     mv.style.display='none'; ph.style.display='flex';
     const avEl = document.getElementById('main-video-av');
-    // Hiện avatar upload nếu có, ngược lại dùng emoji
     if (userProfile.avatarURL?.startsWith('data:')) {
       avEl.innerHTML = `<img src="${userProfile.avatarURL}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.3)">`;
     } else {
-      avEl.textContent = userProfile.avatarURL || '🐣';
+      avEl.innerHTML=''; avEl.textContent = userProfile.avatarURL || '🐣';
     }
     document.getElementById('main-video-name').textContent = userProfile.name;
   }
-  document.getElementById('main-video-label').textContent = userProfile.name+' (Bạn)';
+  document.getElementById('main-video-label').textContent = userProfile.name + ' (Bạn)';
 }
 
+// Strip chỉ render bản thân ban đầu; người khác được append realtime
 function renderCallStrip() {
-  const strip=document.getElementById('call-strip'); strip.innerHTML='';
-  const myThumb=makeThumb(currentUser.uid,userProfile,localStream,true);
+  const strip = document.getElementById('call-strip');
+  strip.innerHTML = '';
+  const myThumb = makeThumb(currentUser.uid, userProfile, localStream, true);
   myThumb.classList.add('active');
-  myThumb.addEventListener('click',()=>switchMain(currentUser.uid));
+  myThumb.addEventListener('click', ()=>switchMain(currentUser.uid));
   strip.appendChild(myThumb);
-  Object.entries(roomMembers).forEach(([uid,profile])=>{
-    if (uid===currentUser.uid) return;
-    const th=makeThumb(uid,profile,peerConns[uid]?._remoteStream||null,false);
-    th.addEventListener('click',()=>switchMain(uid));
-    strip.appendChild(th);
-  });
 }
 
-function makeThumb(uid,profile,stream,isLocal) {
-  const th=document.createElement('div'); th.className='call-thumb'; th.id='thumb-'+uid;
+function makeThumb(uid, profile, stream, isLocal) {
+  const th = document.createElement('div');
+  th.className = 'call-thumb'; th.id = 'thumb-'+uid;
   if (stream) {
-    const v=document.createElement('video');
+    const v = document.createElement('video');
     v.autoplay=true; v.playsInline=true; v.muted=isLocal; v.srcObject=stream;
-    v.style.cssText='width:100%;height:100%;object-fit:cover;'; th.appendChild(v);
+    v.style.cssText='width:100%;height:100%;object-fit:cover;';
+    th.appendChild(v);
   } else {
-    const av=document.createElement('div'); av.className='call-thumb-av';
-    if (profile.avatarURL?.startsWith('data:')) {
+    const av = document.createElement('div'); av.className='call-thumb-av';
+    if (profile?.avatarURL?.startsWith('data:')) {
       av.innerHTML=`<img src="${profile.avatarURL}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">`;
-    } else {
-      av.textContent=profile.avatarURL||'🐣';
-    }
+    } else { av.textContent = profile?.avatarURL||'🐣'; }
     th.appendChild(av);
   }
-  const lbl=document.createElement('div'); lbl.className='call-thumb-label';
-  lbl.textContent=profile.name+(isLocal?' (Bạn)':''); th.appendChild(lbl);
+  const lbl = document.createElement('div'); lbl.className='call-thumb-label';
+  lbl.textContent = (profile?.name||'Bạn') + (isLocal?' (Bạn)':'');
+  th.appendChild(lbl);
   return th;
 }
 
 function switchMain(uid) {
   document.querySelectorAll('.call-thumb').forEach(t=>t.classList.remove('active'));
-  const thumb=document.getElementById('thumb-'+uid);
+  const thumb = document.getElementById('thumb-'+uid);
   if (thumb) thumb.classList.add('active');
-  const mv=document.getElementById('main-video-el');
-  const ph=document.getElementById('main-video-placeholder');
-  const profile=uid===currentUser.uid?userProfile:roomMembers[uid];
-  const stream=uid===currentUser.uid?localStream:(peerConns[uid]?._remoteStream||null);
+  const mv = document.getElementById('main-video-el');
+  const ph = document.getElementById('main-video-placeholder');
+  if (uid === currentUser.uid) {
+    showLocalInMain(); return;
+  }
+  const profile = roomMembers[uid];
+  const stream  = peerConns[uid]?._remoteStream||null;
   if (stream) {
-    mv.srcObject=stream; mv.muted=(uid===currentUser.uid); mv.style.display='block'; ph.style.display='none';
+    mv.srcObject=stream; mv.muted=false; mv.style.display='block'; ph.style.display='none';
   } else {
     mv.style.display='none'; ph.style.display='flex';
     const avEl = document.getElementById('main-video-av');
     if (profile?.avatarURL?.startsWith('data:')) {
       avEl.innerHTML=`<img src="${profile.avatarURL}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.3)">`;
-    } else {
-      avEl.textContent=profile?.avatarURL||'🐣';
-    }
+    } else { avEl.innerHTML=''; avEl.textContent=profile?.avatarURL||'🐣'; }
     document.getElementById('main-video-name').textContent=profile?.name||'Bạn';
   }
-  document.getElementById('main-video-label').textContent=(profile?.name||'Bạn');
+  document.getElementById('main-video-label').textContent = profile?.name||'Bạn';
 }
 
 async function createPeer(remoteUid, isInitiator) {
-  const pc=new RTCPeerConnection(ICE_SERVERS);
-  peerConns[remoteUid]=pc;
+  if (peerConns[remoteUid]) return peerConns[remoteUid];
+  const pc = new RTCPeerConnection(ICE_SERVERS);
+  peerConns[remoteUid] = pc;
   if (localStream) localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-  pc.onicecandidate=async e=>{
-    if (e.candidate) await addDoc(collection(db,'rooms',currentRoomId,'call','signals','ice'),{
+  pc.onicecandidate = async e=>{
+    if (!e.candidate) return;
+    await addDoc(collection(db,'rooms',currentRoomId,'call','signals','ice'),{
       from:currentUser.uid, to:remoteUid, candidate:e.candidate.toJSON(), ts:serverTimestamp()
     });
   };
-  pc.ontrack=e=>{
-    pc._remoteStream=e.streams[0]||new MediaStream([e.track]);
-    renderCallStrip();
+  pc.ontrack = e=>{
+    pc._remoteStream = e.streams[0] || new MediaStream([e.track]);
+    // Cập nhật video trong thumb nếu đang hiển thị
+    const th = document.getElementById('thumb-'+remoteUid);
+    if (th) {
+      let vid = th.querySelector('video');
+      if (!vid) {
+        th.innerHTML=''; // xóa avatar placeholder
+        vid = document.createElement('video');
+        vid.autoplay=true; vid.playsInline=true; vid.muted=false;
+        vid.style.cssText='width:100%;height:100%;object-fit:cover;';
+        const lbl = document.createElement('div'); lbl.className='call-thumb-label';
+        lbl.textContent = roomMembers[remoteUid]?.name||'Bạn';
+        th.appendChild(vid); th.appendChild(lbl);
+      }
+      vid.srcObject = pc._remoteStream;
+    }
   };
   if (isInitiator) {
-    const offer=await pc.createOffer();
+    const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     await addDoc(collection(db,'rooms',currentRoomId,'call','signals','offers'),{
       from:currentUser.uid, to:remoteUid, sdp:offer.sdp, type:offer.type, ts:serverTimestamp()
@@ -2312,37 +2390,39 @@ async function createPeer(remoteUid, isInitiator) {
 }
 
 function listenSignal() {
-  onSnapshot(query(collection(db,'rooms',currentRoomId,'call','signals','offers'),orderBy('ts')),async snap=>{
+  onSnapshot(query(collection(db,'rooms',currentRoomId,'call','signals','offers'),orderBy('ts')), async snap=>{
     for (const ch of snap.docChanges()) {
       if (ch.type!=='added') continue;
-      const d=ch.doc.data(); if (d.to!==currentUser.uid) continue;
-      let pc=peerConns[d.from]; if (!pc) pc=await createPeer(d.from,false);
+      const d = ch.doc.data(); if (d.to!==currentUser.uid) continue;
+      let pc = peerConns[d.from]; if (!pc) pc = await createPeer(d.from, false);
       if (pc.signalingState==='stable') continue;
-      await pc.setRemoteDescription({type:d.type,sdp:d.sdp});
-      const ans=await pc.createAnswer(); await pc.setLocalDescription(ans);
+      await pc.setRemoteDescription({type:d.type, sdp:d.sdp});
+      const ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
       await addDoc(collection(db,'rooms',currentRoomId,'call','signals','answers'),{
         from:currentUser.uid, to:d.from, sdp:ans.sdp, type:ans.type, ts:serverTimestamp()
       });
     }
   });
-  onSnapshot(query(collection(db,'rooms',currentRoomId,'call','signals','answers'),orderBy('ts')),async snap=>{
+  onSnapshot(query(collection(db,'rooms',currentRoomId,'call','signals','answers'),orderBy('ts')), async snap=>{
     for (const ch of snap.docChanges()) {
       if (ch.type!=='added') continue;
-      const d=ch.doc.data(); if (d.to!==currentUser.uid) continue;
-      const pc=peerConns[d.from];
-      if (pc&&pc.signalingState==='have-local-offer') await pc.setRemoteDescription({type:d.type,sdp:d.sdp});
+      const d = ch.doc.data(); if (d.to!==currentUser.uid) continue;
+      const pc = peerConns[d.from];
+      if (pc && pc.signalingState==='have-local-offer') await pc.setRemoteDescription({type:d.type,sdp:d.sdp});
     }
   });
-  onSnapshot(query(collection(db,'rooms',currentRoomId,'call','signals','ice'),orderBy('ts')),async snap=>{
+  onSnapshot(query(collection(db,'rooms',currentRoomId,'call','signals','ice'),orderBy('ts')), async snap=>{
     for (const ch of snap.docChanges()) {
       if (ch.type!=='added') continue;
-      const d=ch.doc.data(); if (d.to!==currentUser.uid) continue;
-      const pc=peerConns[d.from];
+      const d = ch.doc.data(); if (d.to!==currentUser.uid) continue;
+      const pc = peerConns[d.from];
       if (pc) try { await pc.addIceCandidate(new RTCIceCandidate(d.candidate)); } catch(e) {}
     }
   });
 }
 
+// ── Controls ──
 document.getElementById('ctrl-mic').addEventListener('click',()=>{
   micOn=!micOn;
   if (localStream) localStream.getAudioTracks().forEach(t=>t.enabled=micOn);
@@ -2354,14 +2434,26 @@ document.getElementById('ctrl-cam').addEventListener('click',()=>{
   showLocalInMain(); updateCtrlBtns();
 });
 document.getElementById('ctrl-flip').addEventListener('click', async ()=>{
-  facingMode=facingMode==='user'?'environment':'user';
+  facingMode = facingMode==='user' ? 'environment' : 'user';
   try {
-    const ns=await navigator.mediaDevices.getUserMedia({video:{facingMode},audio:true});
-    const newTrack=ns.getVideoTracks()[0];
-    Object.values(peerConns).forEach(pc=>{
-      const s=pc.getSenders().find(s=>s.track?.kind==='video'); if (s) s.replaceTrack(newTrack);
+    // Stop track cũ
+    if (localStream) localStream.getVideoTracks().forEach(t=>t.stop());
+    // Lấy track mới với facingMode mới
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode }, audio:false
     });
-    if (localStream) { localStream.getVideoTracks().forEach(t=>{t.stop();localStream.removeTrack(t);}); localStream.addTrack(newTrack); }
+    const newTrack = newStream.getVideoTracks()[0];
+    // Replace track trong tất cả peer connections
+    for (const pc of Object.values(peerConns)) {
+      const sender = pc.getSenders().find(s=>s.track?.kind==='video');
+      if (sender) await sender.replaceTrack(newTrack);
+    }
+    // Cập nhật localStream
+    if (localStream) {
+      localStream.getVideoTracks().forEach(t=>{ localStream.removeTrack(t); });
+      localStream.addTrack(newTrack);
+    }
+    camOn=true; updateCtrlBtns();
     showLocalInMain();
   } catch(e) { toast('Không thể đổi camera 😔'); }
 });
@@ -2369,8 +2461,8 @@ document.getElementById('ctrl-end').addEventListener('click', ()=>endCall(true))
 document.getElementById('btn-call-back').addEventListener('click', ()=>endCall(true));
 
 function updateCtrlBtns() {
-  document.getElementById('ctrl-mic').textContent=micOn?'🎙️':'🔇';
-  document.getElementById('ctrl-cam').textContent=camOn?'📷':'🚫';
+  document.getElementById('ctrl-mic').textContent = micOn?'🎙️':'🔇';
+  document.getElementById('ctrl-cam').textContent = camOn?'📷':'🚫';
   document.getElementById('ctrl-mic').classList.toggle('off',!micOn);
   document.getElementById('ctrl-cam').classList.toggle('off',!camOn);
 }
