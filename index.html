@@ -1012,6 +1012,15 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
   document.getElementById('screen-loading').style.display = 'none';
 }
+
+// Fallback: nếu Firebase không phản hồi sau 8s → hiện màn login
+setTimeout(() => {
+  const loading = document.getElementById('screen-loading');
+  if (loading && loading.style.display !== 'none') {
+    showScreen('screen-login');
+    console.warn('Firebase timeout — showing login screen');
+  }
+}, 8000);
 function toast(msg, dur=2800) {
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('show');
@@ -1068,6 +1077,7 @@ onAuthStateChanged(auth, async (user) => {
   }
   // Nếu là anonymous user (session cũ trước khi có Google Login) → đăng xuất ngay
   if (user.isAnonymous) {
+    showScreen('screen-login');
     await signOut(auth);
     return;
   }
