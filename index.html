@@ -250,6 +250,40 @@
       padding:14px 20px; background:#fff; border-bottom:2px solid var(--border);
     }
     .room-topbar .room-name-label { font-size:17px; font-weight:900; flex:1; color:var(--green-d); }
+
+    /* ── STREAK BADGE ── */
+    .streak-badge {
+      display:inline-flex; align-items:center; gap:4px;
+      background:linear-gradient(135deg,#fff3c4,#ffe066);
+      border:2px solid #FFC800; border-radius:20px;
+      padding:3px 10px; font-size:13px; font-weight:900;
+      color:#7a5900; white-space:nowrap; cursor:default;
+      box-shadow:0 2px 6px rgba(255,200,0,.25);
+      transition:transform .15s;
+    }
+    .streak-badge:hover { transform:scale(1.05); }
+    .streak-badge .streak-fire { font-size:15px; }
+    .streak-count {
+      display:inline-block;
+      transition:transform .35s cubic-bezier(.34,1.56,.64,1);
+    }
+    .streak-count.pop {
+      animation:streakPop .4s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes streakPop {
+      0%   { transform:scale(1); }
+      40%  { transform:scale(1.55) rotate(-8deg); }
+      70%  { transform:scale(0.9) rotate(4deg); }
+      100% { transform:scale(1) rotate(0deg); }
+    }
+    /* Home screen streak */
+    .home-streak { margin-top:4px; }
+    /* User menu streak line */
+    .user-menu-streak {
+      padding:6px 14px 2px; font-size:12px; font-weight:800;
+      color:var(--muted); display:flex; align-items:center; gap:6px;
+      border-bottom:1px solid var(--border); margin-bottom:2px;
+    }
     .user-menu-wrap { position:relative; }
     .user-menu-dropdown {
       display:none; position:absolute; top:calc(100% + 8px); right:0;
@@ -996,6 +1030,11 @@
       <div>
         <h2 id="home-username">Bạn ơi</h2>
         <p>Chào mừng trở lại! 👋</p>
+        <div class="home-streak">
+          <span class="streak-badge" id="streak-home" style="display:none">
+            <span class="streak-fire">🔥</span><span class="streak-count" id="streak-count-home">0</span><span style="font-size:11px;opacity:.75"> ngày</span>
+          </span>
+        </div>
       </div>
     </div>
     <div class="section-label">Phòng học của bạn</div>
@@ -1073,6 +1112,10 @@
     <div class="room-topbar">
       <span class="room-name-label" id="room-name-display">Phòng học</span>
       <span id="room-member-count" style="font-size:12px;font-weight:800;color:var(--muted);background:#f0fdf4;border:1.5px solid var(--border);border-radius:20px;padding:3px 10px;white-space:nowrap">0/12</span>
+      <!-- STREAK BADGE (topbar) -->
+      <span class="streak-badge" id="streak-topbar" style="display:none">
+        <span class="streak-fire">🔥</span><span class="streak-count" id="streak-count-topbar">0</span>
+      </span>
       <button class="icon-btn" id="btn-copy-code" title="Sao chép mã phòng">📋</button>
       <!-- manage menu -->
       <div class="manage-menu-wrap">
@@ -1088,6 +1131,9 @@
       <div class="user-menu-wrap">
         <div id="room-avatar-wrap"></div>
         <div class="user-menu-dropdown" id="user-menu">
+          <div class="user-menu-streak" id="streak-menu-line" style="display:none">
+            🔥 Streak: <span class="streak-count" id="streak-count-menu">0</span> ngày liên tiếp
+          </div>
           <button id="menu-home">🏠 Trang chủ</button>
           <button id="menu-edit-name">✏️ Chỉnh sửa tên</button>
           <button id="menu-edit-avatar">🖼️ Đổi avatar</button>
@@ -1526,6 +1572,8 @@ async function renderHome() {
   });
   wrap.appendChild(av);
   document.getElementById('home-username').textContent = userProfile.name;
+  // Show streak on home screen (uses studyData from current/last room)
+  updateStreakUI(calcStreak());
   await loadRooms();
 }
 
@@ -1637,7 +1685,10 @@ async function enterRoom(roomId, roomName) {
   wrap.innerHTML='';
   const av=mkAv(userProfile.avatarURL,38);
   av.style.cursor='pointer';
-  av.addEventListener('click',()=>document.getElementById('user-menu').classList.toggle('open'));
+  av.addEventListener('click',()=>{
+    document.getElementById('user-menu').classList.toggle('open');
+    updateStreakUI(calcStreak());
+  });
   wrap.appendChild(av);
 
   showScreen('screen-room');
@@ -1732,6 +1783,7 @@ async function enterRoom(roomId, roomName) {
     snap.forEach(d=>{ studyData[d.id]=d.data(); });
     renderCalendar();
     renderClocks();
+    updateStreakUI(calcStreak());
   });
 
   // init calendar
@@ -3373,11 +3425,43 @@ function calcStreak() {
 }
 
 function updateStreakUI(streak) {
-  document.querySelectorAll('.streak-count').forEach(el => el.textContent = streak);
-  document.querySelectorAll('.streak-badge').forEach(el => {
-    el.textContent   = streak > 0 ? `🔥 ${streak} ngày` : '';
-    el.style.display = streak > 0 ? 'inline-flex' : 'none';
-  });
+  // --- Topbar badge ---
+  const topbar = document.getElementById('streak-topbar');
+  const topbarCount = document.getElementById('streak-count-topbar');
+  if (topbar) {
+    topbar.style.display = streak > 0 ? 'inline-flex' : 'none';
+    if (topbarCount) { topbarCount.textContent = streak; _popEl(topbarCount); }
+  }
+
+  // --- Home screen badge ---
+  const home = document.getElementById('streak-home');
+  const homeCount = document.getElementById('streak-count-home');
+  if (home) {
+    home.style.display = streak > 0 ? 'inline-flex' : 'none';
+    if (homeCount) { homeCount.textContent = streak; _popEl(homeCount); }
+  }
+
+  // --- User menu line ---
+  const menuLine = document.getElementById('streak-menu-line');
+  const menuCount = document.getElementById('streak-count-menu');
+  if (menuLine) {
+    menuLine.style.display = streak > 0 ? 'flex' : 'none';
+    if (menuCount) { menuCount.textContent = streak; _popEl(menuCount); }
+  }
+
+  // Legacy selectors (fallback)
+  document.querySelectorAll('.streak-count:not(#streak-count-topbar):not(#streak-count-home):not(#streak-count-menu)')
+    .forEach(el => { el.textContent = streak; _popEl(el); });
+  document.querySelectorAll('.streak-badge:not(#streak-topbar):not(#streak-home)')
+    .forEach(el => { el.style.display = streak > 0 ? 'inline-flex' : 'none'; });
+}
+
+function _popEl(el) {
+  if (!el) return;
+  el.classList.remove('pop');
+  void el.offsetWidth; // reflow to restart animation
+  el.classList.add('pop');
+  setTimeout(() => el.classList.remove('pop'), 450);
 }
 
 /* ── Trigger ── */
