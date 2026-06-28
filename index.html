@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=1024, initial-scale=1.0" />
   <title>Học cùng nhau</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
@@ -345,7 +345,44 @@
     }
     .toast.show { transform:translateX(-50%) translateY(0); }
 
-    /* RESPONSIVE — mobile giữ layout ngang giống desktop, chỉ scale */
+    /* ── ROTATE OVERLAY ── */
+    #rotate-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: linear-gradient(160deg, #e8f8e0 0%, #d4f0ff 100%);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      text-align: center;
+      padding: 32px;
+    }
+    #rotate-overlay .rotate-icon {
+      font-size: 72px;
+      animation: rotateHint 2s ease-in-out infinite;
+    }
+    @keyframes rotateHint {
+      0%   { transform: rotate(0deg); }
+      30%  { transform: rotate(-90deg); }
+      60%  { transform: rotate(-90deg); }
+      100% { transform: rotate(0deg); }
+    }
+    #rotate-overlay h2 { font-size: 22px; font-weight: 900; color: var(--green-d); }
+    #rotate-overlay p  { font-size: 14px; color: var(--muted); font-weight: 700; line-height: 1.6; }
+
+    /* Portrait mobile → show overlay only */
+    @media screen and (max-width: 767px) and (orientation: portrait) {
+      #rotate-overlay { display: flex !important; }
+      body > *:not(#rotate-overlay) { display: none !important; }
+    }
+    /* Landscape mobile → hide overlay, keep desktop layout intact */
+    @media screen and (orientation: landscape) and (max-height: 600px) {
+      #rotate-overlay { display: none !important; }
+    }
+
+    /* OLD RESPONSIVE — kept but now unreachable on real portrait mobile */
     @media(max-width:700px) {
       /* Room screen: giữ flex-row, sidebar thu nhỏ */
       #screen-room { flex-direction:row; height:100dvh; overflow:hidden; }
@@ -973,6 +1010,13 @@
     <button class="ctrl-btn end" id="ctrl-end" title="Kết thúc cuộc gọi">📵</button>
     <button class="ctrl-btn" id="ctrl-flip" title="Đổi camera trước/sau" style="display:none">🔄</button>
   </div>
+</div>
+
+<!-- ── ROTATE OVERLAY ── -->
+<div id="rotate-overlay">
+  <div class="rotate-icon">📱</div>
+  <h2>Xoay điện thoại ngang nhé!</h2>
+  <p>Website này được thiết kế cho màn hình ngang.<br>Vui lòng xoay điện thoại sang chế độ <strong>landscape</strong> để sử dụng.</p>
 </div>
 
 <div class="toast" id="toast"></div>
