@@ -359,7 +359,7 @@
       #screen-room { flex-direction:row; height:100dvh; overflow:hidden; }
       .room-sidebar { width:220px; min-width:180px; }
       .calendar-wrap { max-height:200px; }
-      .chat-section { height:180px; }
+      .chat-section { height:240px; }
       .clocks-section { padding:10px 12px; }
       .clock-card { min-width:100px; padding:10px; }
       .clock-time { font-size:17px; }
@@ -400,7 +400,7 @@
     .chat-section {
       display:flex; flex-direction:column;
       border-top:2px solid var(--border); background:var(--card);
-      height:260px; min-height:180px; flex-shrink:0;
+      height:340px; min-height:220px; flex-shrink:0;
     }
     .chat-header {
       padding:8px 16px; font-size:11px; font-weight:800;
@@ -1541,61 +1541,132 @@ async function enterRoom(roomId, roomName) {
   const now=new Date();
   calYear=now.getFullYear(); calMonth=now.getMonth();
   renderCalendar();
+  remoteClocks = {};
+  listenClockStatus(roomId);
   renderClocks();
   initChat(roomId);
   listenCall(roomId);
 }
 
 /* ══════════════════════════════════════════
-   CLOCKS
+   CLOCKS — realtime sync
+   Firestore: rooms/{id}/clockStatus/{uid} = { running, startedAt, accumulated }
+   - running: bool
+   - startedAt: timestamp (khi bắt đầu phiên hiện tại)
+   - accumulated: số giây đã tích lũy trước phiên này
+   Chỉ hiển thị card của người đang running (ON)
+   Người xem tính thời gian realtime từ startedAt
 ══════════════════════════════════════════ */
+let clockStatusUnsub = null;
+let remoteClockTick  = null;   // interval để tăng đồng hồ remote mỗi giây
+let remoteClocks     = {};     // { uid: { running, startedAt, accumulated } }
+
 function updateMemberCount() {
   const el = document.getElementById('room-member-count');
   if (el) el.textContent = Object.keys(roomMembers).length + '/12';
 }
 
+// Bắt đầu lắng nghe clockStatus realtime
+function listenClockStatus(roomId) {
+  if (clockStatusUnsub) { clockStatusUnsub(); clockStatusUnsub=null; }
+  if (remoteClockTick) { clearInterval(remoteClockTick); remoteClockTick=null; }
+
+  clockStatusUnsub = onSnapshot(collection(db,'rooms',roomId,'clockStatus'), snap=>{
+    snap.forEach(d=>{
+      const uid = d.id;
+      const data = d.data();
+      remoteClocks[uid] = data;
+    });
+    // Xóa user đã rời phòng
+    Object.keys(remoteClocks).forEach(uid=>{
+      if (!roomMembers[uid] && uid !== currentUser.uid) delete remoteClocks[uid];
+    });
+    renderClocks();
+  });
+
+  // Tick mỗi giây để cập nhật đồng hồ running của mọi người
+  remoteClockTick = setInterval(()=>{
+    const running = Object.entries(remoteClocks).some(([,d])=>d.running);
+    if (!running) return;
+    document.querySelectorAll('.clock-time[data-uid]').forEach(el=>{
+      const uid = el.dataset.uid;
+      const cd  = remoteClocks[uid];
+      if (!cd || !cd.running) return;
+      const elapsed = cd.startedAt
+        ? Math.floor((Date.now() - cd.startedAt.toMillis()) / 1000)
+        : 0;
+      el.textContent = fmtTime((cd.accumulated||0) + elapsed);
+    });
+  }, 1000);
+}
+
 function renderClocks() {
-  const row=document.getElementById('clocks-row');
-  row.innerHTML='';
+  const row = document.getElementById('clocks-row');
   updateMemberCount();
-  const tk=todayKey();
-  const todayData=studyData[tk]||{};
 
-  Object.entries(roomMembers).forEach(([uid,profile])=>{
-    const isMe = uid===currentUser.uid;
-    // đồng hồ hiển thị: phiên hiện tại (mySeconds) nếu là mình,
-    // tổng ngày hôm nay từ Firestore nếu là bạn bè
-    const secs = isMe ? mySeconds : (todayData[uid]||0);
-
-    const card=document.createElement('div');
-    card.className='clock-card'+(isMe?' is-me':'')+(isMe&&isRunning?' running':'');
-    card.id='clock-'+uid;
-
-    const avDiv=document.createElement('div');
-    avDiv.className='clock-av';
-    if (profile.avatarURL?.startsWith('data:')) {
-      const img=document.createElement('img');
-      img.src=profile.avatarURL; img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%';
-      avDiv.appendChild(img);
-    } else { avDiv.textContent=profile.avatarURL||'🐣'; }
-
-    const nameDiv=document.createElement('div');
-    nameDiv.className='clock-name'; nameDiv.textContent=profile.name||'Bạn';
-    const timeDiv=document.createElement('div');
-    timeDiv.className='clock-time'; timeDiv.id='clocktime-'+uid; timeDiv.textContent=fmtTime(secs);
-
-    card.appendChild(avDiv);
-    card.appendChild(nameDiv);
-    card.appendChild(timeDiv);
-
-    if (isMe) {
-      const playBtn=document.createElement('button');
-      playBtn.className='clock-play-btn';
-      playBtn.textContent=isRunning?'⏸':'▶';
-      playBtn.addEventListener('click',()=>toggleClock());
-      card.appendChild(playBtn);
+  // Kết hợp: chỉ hiện người đang running (remote) + bản thân luôn hiện
+  const toShow = {};
+  Object.entries(roomMembers).forEach(([uid, profile])=>{
+    const cd = remoteClocks[uid] || {};
+    if (uid === currentUser.uid || cd.running) {
+      toShow[uid] = { profile, cd };
     }
-    row.appendChild(card);
+  });
+
+  // Nếu không ai running ngoài bản thân (và mình cũng không running) → hiện mình mờ
+  if (Object.keys(toShow).length === 0) {
+    toShow[currentUser.uid] = {
+      profile: userProfile,
+      cd: remoteClocks[currentUser.uid] || {}
+    };
+  }
+
+  // Xóa card của người không còn trong toShow
+  row.querySelectorAll('.clock-card').forEach(card=>{
+    const uid = card.id.replace('clock-','');
+    if (!toShow[uid]) card.remove();
+  });
+
+  Object.entries(toShow).forEach(([uid, { profile, cd }])=>{
+    const isMe     = uid === currentUser.uid;
+    const running  = cd.running || false;
+    const elapsed  = running && cd.startedAt
+      ? Math.floor((Date.now() - cd.startedAt.toMillis()) / 1000) : 0;
+    const secs     = (cd.accumulated||0) + elapsed;
+
+    let card = document.getElementById('clock-'+uid);
+    if (!card) {
+      card = document.createElement('div');
+      card.id = 'clock-'+uid;
+
+      const avDiv = document.createElement('div'); avDiv.className='clock-av';
+      if (profile.avatarURL?.startsWith('data:')) {
+        const img=document.createElement('img');
+        img.src=profile.avatarURL; img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%';
+        avDiv.appendChild(img);
+      } else { avDiv.textContent=profile.avatarURL||'🐣'; }
+
+      const nameDiv=document.createElement('div'); nameDiv.className='clock-name';
+      nameDiv.textContent=profile.name||'Bạn';
+
+      const timeDiv=document.createElement('div'); timeDiv.className='clock-time';
+      timeDiv.dataset.uid=uid; timeDiv.id='clocktime-'+uid;
+
+      card.appendChild(avDiv); card.appendChild(nameDiv); card.appendChild(timeDiv);
+
+      if (isMe) {
+        const playBtn=document.createElement('button'); playBtn.className='clock-play-btn';
+        playBtn.addEventListener('click', toggleClock);
+        card.appendChild(playBtn);
+      }
+      row.appendChild(card);
+    }
+
+    card.className = 'clock-card'+(isMe?' is-me':'')+(running?' running':'');
+    const pb = card.querySelector('.clock-play-btn');
+    if (pb) pb.textContent = running ? '⏸' : '▶';
+    const te = card.querySelector('.clock-time');
+    if (te) te.textContent = fmtTime(secs);
   });
 }
 
@@ -1604,73 +1675,91 @@ function toggleClock() {
   else startClock();
 }
 
-function startClock() {
-  isRunning=true;
-  clockInterval=setInterval(()=>{
-    mySeconds++;
-    const el=document.getElementById('clocktime-'+currentUser.uid);
-    if (el) el.textContent=fmtTime(mySeconds);
-    // update play btn icon
-    const card=document.getElementById('clock-'+currentUser.uid);
-    if (card) {
-      card.classList.add('running');
-      const pb=card.querySelector('.clock-play-btn');
-      if (pb) pb.textContent='⏸';
-    }
-  },1000);
-  renderClocks();
+async function startClock() {
+  isRunning = true;
+  const myAccum = remoteClocks[currentUser.uid]?.accumulated || 0;
+
+  // Ghi lên Firestore để mọi người thấy
+  await setDoc(doc(db,'rooms',currentRoomId,'clockStatus',currentUser.uid),{
+    running: true,
+    startedAt: serverTimestamp(),
+    accumulated: myAccum
+  });
+
+  const card = document.getElementById('clock-'+currentUser.uid);
+  if (card) {
+    card.classList.add('running');
+    const pb = card.querySelector('.clock-play-btn');
+    if (pb) pb.textContent='⏸';
+  }
 }
 
 async function stopClock(save) {
-  isRunning=false;
+  if (!isRunning && !save) return;
+  isRunning = false;
   if (clockInterval) { clearInterval(clockInterval); clockInterval=null; }
-  const card=document.getElementById('clock-'+currentUser?.uid);
+
+  // Tính tổng giây từ remote state
+  const cd = remoteClocks[currentUser.uid] || {};
+  const elapsed = cd.running && cd.startedAt
+    ? Math.floor((Date.now() - cd.startedAt.toMillis()) / 1000) : mySeconds;
+  const totalSecs = (cd.accumulated||0) + elapsed;
+  mySeconds = totalSecs;
+
+  // Reset trên Firestore → mọi người thấy đồng hồ về 0 và card biến mất
+  if (currentUser && currentRoomId) {
+    await setDoc(doc(db,'rooms',currentRoomId,'clockStatus',currentUser.uid),{
+      running: false, startedAt: null, accumulated: 0
+    }).catch(()=>{});
+  }
+
+  // Update local remoteClocks
+  if (remoteClocks[currentUser.uid]) {
+    remoteClocks[currentUser.uid] = { running:false, startedAt:null, accumulated:0 };
+  }
+
+  const card = document.getElementById('clock-'+currentUser.uid);
   if (card) {
     card.classList.remove('running');
-    const pb=card.querySelector('.clock-play-btn');
+    const pb = card.querySelector('.clock-play-btn');
     if (pb) pb.textContent='▶';
+    const te = card.querySelector('.clock-time');
+    if (te) te.textContent = fmtTime(0);
   }
 
-  if (save && currentUser && currentRoomId && mySeconds >= 900) {
-    // ≥15 phút → cộng dồn vào tổng ngày hôm nay
-    await addStudySeconds(mySeconds);
-    toast('Đã lưu ' + fmtTime(mySeconds) + ' vào lịch! 📅');
-  } else if (save && mySeconds > 0 && mySeconds < 900) {
+  if (save && currentUser && currentRoomId && totalSecs >= 900) {
+    await addStudySeconds(totalSecs);
+    toast('Đã lưu ' + fmtTime(totalSecs) + ' vào lịch! 📅');
+  } else if (save && totalSecs > 0 && totalSecs < 900) {
     toast('Cần học ít nhất 15 phút để điểm danh 😊');
   }
-
-  // reset đồng hồ local về 0
   mySeconds = 0;
-  const el = document.getElementById('clocktime-' + currentUser?.uid);
-  if (el) el.textContent = fmtTime(0);
+  lastAutoSaved = 0;
 }
 
 async function addStudySeconds(secs) {
-  // Cộng dồn: lấy tổng hiện tại + thêm secs mới
   const tk = todayKey();
   try {
     const ref  = doc(db,'rooms',currentRoomId,'studyDays',tk);
     const snap = await getDoc(ref);
     const prev = snap.exists() ? (snap.data()?.[currentUser.uid] || 0) : 0;
     const newTotal = prev + secs;
-    if (snap.exists()) {
-      await updateDoc(ref, { [currentUser.uid]: newTotal });
-    } else {
-      await setDoc(ref, { [currentUser.uid]: newTotal });
-    }
+    if (snap.exists()) { await updateDoc(ref, { [currentUser.uid]: newTotal }); }
+    else               { await setDoc(ref, { [currentUser.uid]: newTotal }); }
   } catch(e) { console.error('save study err', e); }
 }
 
-// Auto-save mỗi 60s (lưu tạm, không reset) để không mất data nếu tắt tab
+// Auto-save mỗi 60s
 let lastAutoSaved = 0;
 setInterval(async () => {
-  if (isRunning && currentRoomId && mySeconds > lastAutoSaved) {
-    const delta = mySeconds - lastAutoSaved;
-    if (delta > 0) {
-      // chỉ auto-save nếu đã học ≥15 phút tổng phiên này
-      if (mySeconds >= 900) await addStudySeconds(delta);
-      lastAutoSaved = mySeconds;
-    }
+  if (!isRunning || !currentRoomId) return;
+  const cd = remoteClocks[currentUser.uid] || {};
+  const elapsed = cd.startedAt ? Math.floor((Date.now()-cd.startedAt.toMillis())/1000) : 0;
+  const total = (cd.accumulated||0)+elapsed;
+  if (total >= 900 && total > lastAutoSaved+60) {
+    const delta = total - lastAutoSaved;
+    if (delta > 0) await addStudySeconds(delta);
+    lastAutoSaved = total;
   }
 }, 60000);
 
@@ -1678,14 +1767,38 @@ setInterval(async () => {
 function scheduleMidnightReset() {
   const now=new Date();
   const msToMidnight=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1)-now;
-  setTimeout(()=>{
-    if (isRunning) stopClock(true);
-    mySeconds=0;
+  setTimeout(async ()=>{
+    if (isRunning) await stopClock(true);
+    mySeconds=0; lastAutoSaved=0;
     renderClocks();
     scheduleMidnightReset();
   }, msToMidnight);
 }
 scheduleMidnightReset();
+
+/* ══════════════════════════════════════════
+   BEFOREUNLOAD — tự xử lý khi đóng tab
+══════════════════════════════════════════ */
+window.addEventListener('pagehide', async ()=>{
+  // Reset clock status trên Firestore ngay lập tức
+  if (isRunning && currentRoomId && currentUser) {
+    const cd = remoteClocks[currentUser.uid] || {};
+    const elapsed = cd.startedAt
+      ? Math.floor((Date.now() - cd.startedAt.toMillis()) / 1000) : mySeconds;
+    const total = (cd.accumulated||0) + elapsed;
+    // Ghi clockStatus = stopped
+    const clockRef = doc(db,'rooms',currentRoomId,'clockStatus',currentUser.uid);
+    setDoc(clockRef,{ running:false, startedAt:null, accumulated:0 }).catch(()=>{});
+    // Nếu ≥15 phút → cố lưu studyDays (best-effort, có thể không kịp)
+    if (total >= 900) {
+      addStudySeconds(total).catch(()=>{});
+    }
+  }
+  // Xóa khỏi callParticipants
+  if (currentRoomId && currentUser) {
+    deleteDoc(doc(db,'rooms',currentRoomId,'callParticipants',currentUser.uid)).catch(()=>{});
+  }
+});
 
 /* ══════════════════════════════════════════
    CALENDAR
@@ -1892,12 +2005,16 @@ document.getElementById('btn-save-edit-avatar').addEventListener('click', async(
 
 // Đăng xuất
 async function doLogout() {
-  stopClock(false);
+  if (isRunning) await stopClock(true);
   endCall(true);
-  if (roomUnsub) { roomUnsub(); roomUnsub=null; }
-  if (chatUnsub) { chatUnsub(); chatUnsub=null; }
-  if (callUnsub) { callUnsub(); callUnsub=null; }
-  currentUser=null; userProfile=null; currentRoomId=null; roomMembers={};
+  if (clockStatusUnsub) { clockStatusUnsub(); clockStatusUnsub=null; }
+  if (remoteClockTick)  { clearInterval(remoteClockTick); remoteClockTick=null; }
+  if (roomUnsub)       { roomUnsub(); roomUnsub=null; }
+  if (chatUnsub)       { chatUnsub(); chatUnsub=null; }
+  if (callUnsub)       { callUnsub(); callUnsub=null; }
+  if (callInviteUnsub) { callInviteUnsub(); callInviteUnsub=null; }
+  if (callPartUnsub)   { callPartUnsub(); callPartUnsub=null; }
+  currentUser=null; userProfile=null; currentRoomId=null; roomMembers={}; remoteClocks={};
   document.getElementById('user-menu').classList.remove('open');
   await signOut(auth);
 }
