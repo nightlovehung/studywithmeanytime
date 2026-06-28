@@ -357,88 +357,93 @@
     #notif-container {
       position:fixed; top:16px; right:16px; z-index:1100;
       display:flex; flex-direction:column; gap:8px; pointer-events:none;
-      max-width:320px;
+      max-width:300px; width:calc(100vw - 32px); max-width:300px;
     }
     .notif-toast {
       display:flex; align-items:flex-start; gap:10px;
-      padding:12px 14px; border-radius:14px;
+      padding:12px 36px 12px 14px; border-radius:14px;
       font-family:'Nunito',sans-serif; font-size:13px; font-weight:700;
-      box-shadow:0 4px 20px rgba(0,0,0,.15); pointer-events:all;
-      transform:translateX(120%); opacity:0;
-      transition:transform .35s cubic-bezier(.34,1.56,.64,1), opacity .35s ease;
-      cursor:pointer; position:relative; min-width:220px;
+      box-shadow:0 4px 20px rgba(0,0,0,.14); pointer-events:all;
+      transform:translateX(calc(100% + 24px)); opacity:0;
+      transition:transform .35s cubic-bezier(.34,1.56,.64,1), opacity .3s ease;
+      cursor:pointer; position:relative; line-height:1.45;
+      will-change:transform;
     }
     .notif-toast.show { transform:translateX(0); opacity:1; }
-    .notif-toast.hide { transform:translateX(120%); opacity:0; }
-    .notif-toast.info    { background:#fff; border:2px solid var(--border); color:var(--text); }
-    .notif-toast.success { background:#f0fdf4; border:2px solid var(--theme); color:#2d7a00; }
+    .notif-toast.hide { transform:translateX(calc(100% + 24px)); opacity:0; transition:transform .3s ease, opacity .3s ease; }
+    .notif-toast.info    { background:#fff; border:2px solid #E8F5E9; color:#2D3436; }
+    .notif-toast.success { background:#f0fdf4; border:2px solid #58CC02; color:#2d7a00; }
     .notif-toast.warning { background:#fff8f0; border:2px solid #FF9500; color:#a05a00; }
-    .notif-icon { font-size:18px; flex-shrink:0; margin-top:1px; }
-    .notif-body { flex:1; line-height:1.45; }
-    .notif-title { font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.06em; opacity:.7; margin-bottom:2px; }
-    .notif-close {
-      position:absolute; top:6px; right:8px;
-      background:none; border:none; cursor:pointer;
-      font-size:13px; opacity:.5; padding:2px;
-      font-family:'Nunito',sans-serif; color:inherit;
+    .notif-icon { font-size:17px; flex-shrink:0; margin-top:1px; }
+    .notif-msg  { flex:1; }
+    .notif-label{ display:block; font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; opacity:.55; margin-bottom:2px; }
+    .notif-close-btn {
+      position:absolute; top:7px; right:9px; background:none; border:none;
+      cursor:pointer; font-size:13px; opacity:.45; padding:2px 4px;
+      font-family:'Nunito',sans-serif; color:inherit; line-height:1;
+      border-radius:6px; transition:opacity .15s;
     }
-    .notif-close:hover { opacity:1; }
-    @keyframes notifSlideIn { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
+    .notif-close-btn:hover { opacity:1; }
+
     @media(max-width:700px) {
-      #notif-container { top:8px; right:8px; left:8px; max-width:none; }
-      .notif-toast { transform:translateY(-80px); }
+      #notif-container {
+        top:8px; left:8px; right:8px; max-width:none; width:auto;
+        align-items:stretch;
+      }
+      .notif-toast { transform:translateY(-90px); }
       .notif-toast.show { transform:translateY(0); }
-      .notif-toast.hide { transform:translateY(-80px); }
+      .notif-toast.hide { transform:translateY(-90px); }
     }
 
-    /* Notification history panel */
-    #notif-history-btn {
-      position:fixed; top:16px; left:50%; transform:translateX(-50%);
-      background:var(--card); border:2px solid var(--border);
-      border-radius:100px; padding:6px 14px 6px 10px;
+    /* History panel */
+    #notif-bell-btn {
+      position:fixed; bottom:20px; right:16px; z-index:1050;
+      background:#fff; border:2px solid var(--border);
+      border-radius:100px; padding:7px 13px 7px 10px;
       font-family:'Nunito',sans-serif; font-size:12px; font-weight:800;
-      cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.1);
-      z-index:1050; display:none; align-items:center; gap:6px;
-      color:var(--text); transition:background .15s;
+      cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.1);
+      display:none; align-items:center; gap:6px; color:var(--text);
+      transition:background .15s, border-color .15s;
     }
-    #notif-history-btn:hover { background:#f0fdf4; }
-    #notif-history-btn .notif-badge {
+    #notif-bell-btn:hover { background:var(--theme-l); border-color:var(--theme); }
+    .notif-badge {
       background:var(--red); color:#fff; border-radius:100px;
-      font-size:10px; padding:1px 6px; min-width:18px; text-align:center;
+      font-size:10px; font-weight:900; padding:0 6px; min-width:18px;
+      text-align:center; line-height:18px; display:inline-block;
     }
-    #notif-history-panel {
-      display:none; position:fixed; top:52px; left:50%; transform:translateX(-50%);
-      background:#fff; border:2px solid var(--border); border-radius:16px;
-      width:300px; max-height:340px; overflow-y:auto;
-      box-shadow:0 8px 28px rgba(0,0,0,.12); z-index:1060;
+    #notif-panel {
+      display:none; position:fixed; bottom:60px; right:14px; z-index:1060;
+      background:#fff; border:2px solid var(--border); border-radius:18px;
+      width:290px; max-height:340px; overflow:hidden;
+      box-shadow:0 8px 28px rgba(0,0,0,.13);
       animation:popIn .2s cubic-bezier(.34,1.56,.64,1);
+      flex-direction:column;
     }
-    #notif-history-panel.open { display:block; }
-    .notif-history-header {
+    #notif-panel.open { display:flex; }
+    .np-header {
       display:flex; align-items:center; justify-content:space-between;
-      padding:12px 14px 10px; border-bottom:1px solid var(--border);
-      font-size:12px; font-weight:900; color:var(--green-d);
-      text-transform:uppercase; letter-spacing:.06em;
+      padding:11px 14px 9px; border-bottom:1px solid var(--border);
+      flex-shrink:0;
     }
-    .notif-history-header button {
-      background:none; border:none; cursor:pointer; font-size:11px;
-      font-family:'Nunito',sans-serif; font-weight:800; color:var(--muted);
-      padding:2px 6px; border-radius:6px;
+    .np-header span { font-size:11px; font-weight:900; color:var(--green-d); text-transform:uppercase; letter-spacing:.07em; }
+    .np-clear { background:none; border:none; cursor:pointer; font-size:11px; font-family:'Nunito',sans-serif; font-weight:800; color:var(--muted); padding:3px 7px; border-radius:7px; }
+    .np-clear:hover { background:#f0fdf4; color:var(--green-d); }
+    .np-list { overflow-y:auto; flex:1; }
+    .np-empty { padding:22px; text-align:center; color:var(--muted); font-size:13px; font-weight:700; }
+    .np-item {
+      display:flex; align-items:flex-start; gap:9px;
+      padding:9px 14px; border-bottom:1px solid #f5f5f5; font-size:12px;
     }
-    .notif-history-header button:hover { background:#f0fdf4; color:var(--green-d); }
-    .notif-history-item {
-      display:flex; align-items:flex-start; gap:8px;
-      padding:9px 14px; border-bottom:1px solid #f5f5f5;
-      font-size:12px; color:var(--text);
-    }
-    .notif-history-item:last-child { border-bottom:none; }
-    .notif-history-item .hi-icon { font-size:14px; margin-top:1px; flex-shrink:0; }
-    .notif-history-item .hi-text { flex:1; line-height:1.4; font-weight:700; }
-    .notif-history-item .hi-time { font-size:10px; color:var(--muted); font-weight:800; margin-top:2px; }
-    .notif-history-empty { padding:20px; text-align:center; color:var(--muted); font-size:13px; font-weight:700; }
+    .np-item:last-child { border-bottom:none; }
+    .np-item-icon { font-size:14px; flex-shrink:0; margin-top:1px; }
+    .np-item-body { flex:1; }
+    .np-item-text { font-weight:700; color:var(--text); line-height:1.4; }
+    .np-item-time { font-size:10px; color:var(--muted); font-weight:800; margin-top:2px; }
+    .np-item.success .np-item-text { color:#2d7a00; }
+    .np-item.warning .np-item-text { color:#a05a00; }
     @media(max-width:700px) {
-      #notif-history-btn { top:auto; bottom:80px; left:auto; right:12px; transform:none; }
-      #notif-history-panel { top:auto; bottom:130px; left:auto; right:8px; transform:none; width:290px; }
+      #notif-bell-btn { bottom:14px; right:10px; }
+      #notif-panel { right:8px; bottom:56px; width:calc(100vw - 16px); }
     }
 
     /* RESPONSIVE — mobile giữ layout ngang giống desktop, chỉ scale */
@@ -853,18 +858,18 @@
 </head>
 <body>
 
-<!-- ══ NOTIFICATION SYSTEM ══ -->
+<!-- ══ NOTIFICATION LAYER ══ -->
 <div id="notif-container"></div>
-<button id="notif-history-btn" aria-label="Xem thông báo cũ">
-  🔔 <span id="notif-history-count" class="notif-badge">0</span> thông báo
+<button id="notif-bell-btn" aria-label="Lịch sử thông báo">
+  🔔 <span id="notif-badge" class="notif-badge">0</span>
 </button>
-<div id="notif-history-panel">
-  <div class="notif-history-header">
-    🗂 Lịch sử thông báo
-    <button id="notif-clear-btn">Xoá tất cả</button>
+<div id="notif-panel">
+  <div class="np-header">
+    <span>🗂 Thông báo</span>
+    <button class="np-clear" id="notif-clear">Xoá tất cả</button>
   </div>
-  <div id="notif-history-list">
-    <div class="notif-history-empty">Chưa có thông báo nào 👋</div>
+  <div class="np-list" id="notif-list">
+    <div class="np-empty">Chưa có thông báo 👋</div>
   </div>
 </div>
 
@@ -1591,7 +1596,7 @@ async function enterRoom(roomId, roomName) {
   roomUnsub = onSnapshot(doc(db,'rooms',roomId), async snap=>{
     if (!snap.exists()) {
       // Phòng bị xóa
-      notify('Phòng học đã bị xóa bởi chủ phòng 😢', 'warning', '🗑️');
+      notify('Phòng học đã bị xóa bởi chủ phòng 🗑️', 'warning', '🗑️');
       toast('Phòng học đã bị xóa 😢');
       stopClock(false);
       showScreen('screen-home');
@@ -1619,14 +1624,16 @@ async function enterRoom(roomId, roomName) {
     }
 
     // Load profile cho member mới chưa có
-    const prevUids = Object.keys(roomMembers);
+    const _prevUids = new Set(Object.keys(roomMembers));
     await Promise.all(newMembers.map(async uid=>{
       if (!roomMembers[uid]) {
         const s=await getDoc(doc(db,'users',uid));
         if (s.exists()) {
           roomMembers[uid]=s.data();
           if (uid !== currentUser.uid) {
-            notify(`${roomMembers[uid].name} vừa vào phòng 👋`, 'info', roomMembers[uid].avatarURL?.startsWith('data:') ? '🙂' : (roomMembers[uid].avatarURL || '🙂'));
+            const p = roomMembers[uid];
+            const ico = p.avatarURL?.startsWith('data:') ? '🙂' : (p.avatarURL||'🙂');
+            notify(`${p.name} vừa vào phòng học 👋`, 'info', ico);
           }
         }
       }
@@ -1634,9 +1641,11 @@ async function enterRoom(roomId, roomName) {
     // Xóa member đã rời/bị kick khỏi roomMembers
     Object.keys(roomMembers).forEach(uid=>{
       if (!newMembers.includes(uid)) {
-        const leftName = roomMembers[uid]?.name || 'Ai đó';
+        if (uid !== currentUser.uid) {
+          const leftName = roomMembers[uid]?.name || 'Ai đó';
+          notify(`${leftName} đã rời phòng 🚪`, 'warning', '🚪');
+        }
         delete roomMembers[uid];
-        notify(`${leftName} đã rời phòng 🚪`, 'warning', '🚪');
       }
     });
     renderClocks(); // Cập nhật đồng hồ + member count ngay
@@ -1822,8 +1831,9 @@ async function stopClock(save) {
   if (te) te.textContent = fmtTime(0);
 
   if (save && currentUser && currentRoomId && totalSecs >= 900) {
+    // Truyền tổng tuyệt đối — addStudySeconds dùng MAX, không cộng 2 lần dù đã auto-save
     await addStudySeconds(totalSecs);
-    notify('Đã lưu ' + fmtTime(totalSecs) + ' vào lịch! 📅', 'success', '🗓️');
+    notify('Đã lưu ' + fmtTime(totalSecs) + ' vào lịch hôm nay! 📅', 'success', '🗓️');
     toast('Đã lưu ' + fmtTime(totalSecs) + ' vào lịch! 📅');
   } else if (save && totalSecs > 0 && totalSecs < 900) {
     notify('Cần học ít nhất 15 phút để điểm danh 😊', 'info', '⏱️');
@@ -1833,14 +1843,16 @@ async function stopClock(save) {
 }
 
 async function addStudySeconds(secs) {
+  // secs = tổng giây tuyệt đối của phiên hôm nay cho user này
+  // Luôn ghi đè bằng MAX(prev, secs) để tránh double-count khi auto-save + stop cùng lúc
   const tk = todayKey();
   try {
     const ref  = doc(db,'rooms',currentRoomId,'studyDays',tk);
     const snap = await getDoc(ref);
     const prev = snap.exists() ? (snap.data()?.[currentUser.uid]||0) : 0;
-    const newTotal = prev + secs;
-    if (snap.exists()) await updateDoc(ref,{[currentUser.uid]:newTotal});
-    else               await setDoc(ref,{[currentUser.uid]:newTotal});
+    const toWrite = Math.max(prev, secs); // không bao giờ giảm, không cộng dồn 2 lần
+    if (snap.exists()) await updateDoc(ref,{[currentUser.uid]:toWrite});
+    else               await setDoc(ref,{[currentUser.uid]:toWrite});
   } catch(e) { console.error('save study err',e); }
 }
 
@@ -1851,10 +1863,10 @@ setInterval(async ()=>{
   const elapsed = cd.startedAt ? Math.floor((Date.now()-cd.startedAt.toMillis())/1000) : 0;
   const total = (cd.accumulated||0)+elapsed;
   if (total >= 900 && total > lastAutoSaved+60) {
-    const delta = total - lastAutoSaved;
-    const isFirstMilestone = lastAutoSaved === 0;
-    if (delta > 0) await addStudySeconds(delta);
-    if (isFirstMilestone) notify('Đã học đủ 15 phút — tô xanh lịch hôm nay! 🎉', 'success', '📅');
+    const isFirst = lastAutoSaved === 0;
+    // Ghi tổng tuyệt đối — addStudySeconds dùng MAX nên không bị cộng 2 lần
+    await addStudySeconds(total);
+    if (isFirst) notify('Đã học đủ 15 phút — lịch hôm nay tô xanh rồi! 🎉', 'success', '📅');
     lastAutoSaved = total;
   }
 }, 60000);
@@ -1871,19 +1883,39 @@ function scheduleMidnightReset() {
 }
 scheduleMidnightReset();
 
-// pagehide: tự lưu khi đóng tab
+// pagehide: tự lưu khi đóng tab / thoát trang
 window.addEventListener('pagehide', ()=>{
-  if (isRunning && currentRoomId && currentUser) {
+  if (!currentUser || !currentRoomId) return;
+
+  // ── 1. Dừng đồng hồ & lưu thời gian học ──
+  if (isRunning) {
     const cd = remoteClocks[currentUser.uid]||{};
     const elapsed = cd.startedAt
       ? Math.floor((Date.now()-cd.startedAt.toMillis())/1000) : mySeconds;
     const total = (cd.accumulated||0)+elapsed;
+    // Reset clockStatus
     setDoc(doc(db,'rooms',currentRoomId,'clockStatus',currentUser.uid),
       {running:false,startedAt:null,accumulated:0}).catch(()=>{});
+    // Lưu thời gian tuyệt đối (dùng MAX nên không bị cộng 2 lần)
     if (total >= 900) addStudySeconds(total).catch(()=>{});
   }
-  if (currentRoomId && currentUser) {
+
+  // ── 2. Kết thúc video call (nếu đang trong call) ──
+  const inCall = document.getElementById('screen-call')?.classList.contains('active');
+  if (inCall || localStream) {
+    // Dừng tất cả media tracks
+    if (localStream) { localStream.getTracks().forEach(t=>t.stop()); }
+    // Xóa khỏi callParticipants
     deleteDoc(doc(db,'rooms',currentRoomId,'callParticipants',currentUser.uid)).catch(()=>{});
+    // Nếu là người khởi xướng, hủy invite
+    try {
+      const invData = remoteClocks['__callInvite__'];
+      if (invData?.startedBy === currentUser.uid) {
+        setDoc(doc(db,'rooms',currentRoomId,'call','invite'),{active:false},{merge:true}).catch(()=>{});
+      }
+    } catch(e){}
+    // Đóng tất cả peer connections
+    Object.values(peerConns||{}).forEach(pc=>{ try{pc.close();}catch(e){} });
   }
 });
 
@@ -2718,8 +2750,37 @@ async function doDeleteRoom() {
    5. Cleanup: invite tự expire sau 60s (kiểm tra ts khi nhận)
 ══════════════════════════════════════════ */
 const ICE_SERVERS = { iceServers:[
-  {urls:'stun:stun.l.google.com:19302'},
-  {urls:'stun:stun1.l.google.com:19302'}
+  // STUN — Google (miễn phí, luôn dùng)
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  // TURN — Metered.ca (free tier, hoạt động xuyên NAT/firewall)
+  {
+    urls: 'turn:a.relay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  {
+    urls: 'turn:a.relay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  {
+    urls: 'turn:a.relay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  // TURN — OpenRelay backup
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  }
 ]};
 
 let callInviteUnsub = null;  // listener invite
@@ -2755,8 +2816,8 @@ function listenCall(roomId) {
 
     // Hiện popup cho người khác
     const caller = roomMembers[data.startedBy] || { name:'Bạn bè', avatarURL:'📹' };
-    const callerIcon = caller.avatarURL?.startsWith('data:') ? '📹' : (caller.avatarURL || '📹');
-    notify(`${caller.name} đang bắt đầu video call! 📹`, 'info', callerIcon, { dur: 8000 });
+    const callerIco = caller.avatarURL?.startsWith('data:') ? '📹' : (caller.avatarURL||'📹');
+    notify(`${caller.name} đang bắt đầu video call! 📹`, 'info', callerIco);
     const avEl = document.getElementById('incoming-caller-av');
     if (caller.avatarURL?.startsWith('data:')) {
       avEl.innerHTML = `<img src="${caller.avatarURL}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--theme);display:block;margin:0 auto">`;
@@ -2835,7 +2896,7 @@ async function joinCall() {
         const th = makeThumb(uid, profile, null, false);
         th.addEventListener('click', ()=>switchMain(uid));
         document.getElementById('call-strip').appendChild(th);
-        notify(`${profile.name || 'Ai đó'} vừa tham gia cuộc gọi 📹`, 'info', '📹');
+        notify(`${profile.name||'Ai đó'} đã vào cuộc gọi 📹`, 'info', '📹');
         // Tạo WebRTC peer nếu chưa có
         if (!peerConns[uid]) {
           createPeer(uid, true); // mình là initiator với người vừa join
@@ -2847,10 +2908,10 @@ async function joinCall() {
     document.querySelectorAll('.call-thumb').forEach(th=>{
       const uid = th.id.replace('thumb-','');
       if (uid !== currentUser.uid && !parts[uid]) {
-        const leftProfile = roomMembers[uid];
+        const leftName = (roomMembers[uid]||{}).name || 'Ai đó';
         th.remove();
         if (peerConns[uid]) { peerConns[uid].close(); delete peerConns[uid]; }
-        if (leftProfile) notify(`${leftProfile.name} đã rời cuộc gọi`, 'warning', '📴');
+        notify(`${leftName} đã rời cuộc gọi`, 'warning', '📴');
       }
     });
 
@@ -2865,14 +2926,14 @@ async function joinCall() {
 }
 
 // ── endCall ──
-async function endCall(notify=true) {
+async function endCall(shouldCleanup=true) {
   if (callPartUnsub) { callPartUnsub(); callPartUnsub=null; }
   if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
   Object.values(peerConns).forEach(pc=>pc.close()); peerConns={};
   document.getElementById('screen-call').classList.remove('active');
   document.getElementById('call-incoming').classList.remove('active');
 
-  if (!notify || !currentRoomId || !currentUser) return;
+  if (!shouldCleanup || !currentRoomId || !currentUser) return;
 
   // Xóa mình khỏi participants
   await deleteDoc(doc(db,'rooms',currentRoomId,'callParticipants',currentUser.uid)).catch(()=>{});
@@ -3071,120 +3132,111 @@ document.getElementById('ctrl-flip').addEventListener('click', async ()=>{
 document.getElementById('ctrl-end').addEventListener('click', ()=>endCall(true));
 document.getElementById('btn-call-back').addEventListener('click', ()=>endCall(true));
 
+function updateCtrlBtns() {
+  document.getElementById('ctrl-mic').textContent = micOn?'🎙️':'🔇';
+  document.getElementById('ctrl-cam').textContent = camOn?'📷':'🚫';
+  document.getElementById('ctrl-mic').classList.toggle('off',!micOn);
+  document.getElementById('ctrl-cam').classList.toggle('off',!camOn);
+}
+
 /* ══════════════════════════════════════════
    NOTIFICATION SYSTEM
-   notify(msg, type, icon, opts)
-   type: 'info' | 'success' | 'warning'
+   notify(msg, type='info'|'success'|'warning', icon?)
 ══════════════════════════════════════════ */
-const notifHistory = [];
-let notifHistoryOpen = false;
+const _notifHistory = [];
+let _notifPanelOpen = false;
 
-const NOTIF_ICONS = { info:'💬', success:'✅', warning:'⚠️' };
-const NOTIF_LABELS = { info:'Info', success:'Tuyệt vời!', warning:'Chú ý' };
-const NOTIF_DURATION = { info:3500, success:4000, warning:5500 };
+const _NICON  = { info:'💬', success:'✅', warning:'⚠️' };
+const _NLABEL = { info:'Thông báo', success:'Tuyệt vời!', warning:'Chú ý' };
+const _NDUR   = { info:3500, success:4500, warning:6000 };
 
-function notify(msg, type='info', icon=null, opts={}) {
+function notify(msg, type='info', icon=null) {
+  const ico = icon || _NICON[type];
+
+  // Lưu history (max 50)
+  _notifHistory.unshift({ msg, type, ico, ts: new Date() });
+  if (_notifHistory.length > 50) _notifHistory.pop();
+  _refreshPanel();
+  _refreshBell();
+
+  // Tạo toast
   const container = document.getElementById('notif-container');
   if (!container) return;
-
-  const actualIcon = icon || NOTIF_ICONS[type] || '💬';
-  const dur = opts.dur || NOTIF_DURATION[type];
-
-  // ── Add to history ──
-  const ts = new Date();
-  notifHistory.unshift({ msg, type, icon: actualIcon, ts });
-  if (notifHistory.length > 40) notifHistory.pop();
-  updateHistoryPanel();
-  updateHistoryBtn();
-
-  // ── Toast element ──
   const el = document.createElement('div');
   el.className = `notif-toast ${type}`;
   el.innerHTML = `
-    <span class="notif-icon">${actualIcon}</span>
-    <div class="notif-body">
-      <div class="notif-title">${NOTIF_LABELS[type]}</div>
-      <div>${msg}</div>
+    <span class="notif-icon">${ico}</span>
+    <div class="notif-msg">
+      <span class="notif-label">${_NLABEL[type]}</span>
+      ${msg}
     </div>
-    <button class="notif-close" title="Đóng">✕</button>
-  `;
+    <button class="notif-close-btn" title="Đóng">✕</button>`;
 
-  const closeBtn = el.querySelector('.notif-close');
-  function dismiss() {
-    el.classList.remove('show');
-    el.classList.add('hide');
-    setTimeout(() => el.remove(), 380);
-  }
-  closeBtn.addEventListener('click', e => { e.stopPropagation(); dismiss(); });
+  let _dismissed = false;
+  const dismiss = () => {
+    if (_dismissed) return; _dismissed = true;
+    el.classList.remove('show'); el.classList.add('hide');
+    setTimeout(() => el.remove(), 350);
+  };
+  el.querySelector('.notif-close-btn').addEventListener('click', e => { e.stopPropagation(); dismiss(); });
   el.addEventListener('click', dismiss);
-
   container.appendChild(el);
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
-  setTimeout(dismiss, dur);
+  setTimeout(dismiss, _NDUR[type]);
 }
 
-function updateHistoryBtn() {
-  const btn = document.getElementById('notif-history-btn');
-  const count = document.getElementById('notif-history-count');
+function _refreshBell() {
+  const btn = document.getElementById('notif-bell-btn');
+  const badge = document.getElementById('notif-badge');
   if (!btn) return;
-  if (notifHistory.length > 0) {
-    btn.style.display = 'flex';
-    count.textContent = notifHistory.length > 99 ? '99+' : notifHistory.length;
-  } else {
-    btn.style.display = 'none';
-  }
+  const count = _notifHistory.length;
+  btn.style.display = count ? 'flex' : 'none';
+  badge.textContent = count > 99 ? '99+' : count;
 }
 
-function updateHistoryPanel() {
-  const list = document.getElementById('notif-history-list');
+function _refreshPanel() {
+  const list = document.getElementById('notif-list');
   if (!list) return;
-  if (!notifHistory.length) {
-    list.innerHTML = '<div class="notif-history-empty">Chưa có thông báo nào 👋</div>';
-    return;
+  if (!_notifHistory.length) {
+    list.innerHTML = '<div class="np-empty">Chưa có thông báo 👋</div>'; return;
   }
   list.innerHTML = '';
-  notifHistory.forEach(n => {
+  _notifHistory.forEach(n => {
+    const ago = Math.floor((Date.now() - n.ts) / 60000);
+    const timeStr = ago < 1 ? 'Vừa xong' : ago < 60
+      ? `${ago} phút trước`
+      : n.ts.getHours().toString().padStart(2,'0') + ':' + n.ts.getMinutes().toString().padStart(2,'0');
     const item = document.createElement('div');
-    item.className = 'notif-history-item';
-    const mins = Math.floor((Date.now() - n.ts) / 60000);
-    const timeStr = mins < 1 ? 'Vừa xong' : mins < 60 ? `${mins} phút trước` :
-      n.ts.getHours().toString().padStart(2,'0') + ':' + n.ts.getMinutes().toString().padStart(2,'0');
-    item.innerHTML = `
-      <span class="hi-icon">${n.icon}</span>
-      <div style="flex:1">
-        <div class="hi-text">${n.msg}</div>
-        <div class="hi-time">${timeStr}</div>
+    item.className = `np-item ${n.type}`;
+    item.innerHTML = `<span class="np-item-icon">${n.ico}</span>
+      <div class="np-item-body">
+        <div class="np-item-text">${n.msg}</div>
+        <div class="np-item-time">${timeStr}</div>
       </div>`;
     list.appendChild(item);
   });
 }
 
-// Toggle history panel
-document.getElementById('notif-history-btn').addEventListener('click', e => {
+document.getElementById('notif-bell-btn').addEventListener('click', e => {
   e.stopPropagation();
-  notifHistoryOpen = !notifHistoryOpen;
-  const panel = document.getElementById('notif-history-panel');
-  if (notifHistoryOpen) { updateHistoryPanel(); panel.classList.add('open'); }
-  else panel.classList.remove('open');
+  _notifPanelOpen = !_notifPanelOpen;
+  _refreshPanel();
+  document.getElementById('notif-panel').classList.toggle('open', _notifPanelOpen);
 });
-
-document.getElementById('notif-clear-btn').addEventListener('click', e => {
+document.getElementById('notif-clear').addEventListener('click', e => {
   e.stopPropagation();
-  notifHistory.length = 0;
-  updateHistoryPanel();
-  updateHistoryBtn();
-  document.getElementById('notif-history-panel').classList.remove('open');
-  notifHistoryOpen = false;
+  _notifHistory.length = 0;
+  _refreshPanel(); _refreshBell();
+  document.getElementById('notif-panel').classList.remove('open');
+  _notifPanelOpen = false;
 });
-
 document.addEventListener('click', e => {
-  if (!document.getElementById('notif-history-btn').contains(e.target) &&
-      !document.getElementById('notif-history-panel').contains(e.target)) {
-    document.getElementById('notif-history-panel').classList.remove('open');
-    notifHistoryOpen = false;
+  const bell = document.getElementById('notif-bell-btn');
+  const panel = document.getElementById('notif-panel');
+  if (bell && panel && !bell.contains(e.target) && !panel.contains(e.target)) {
+    panel.classList.remove('open'); _notifPanelOpen = false;
   }
 });
-
 </script>
 </body>
 </html>
