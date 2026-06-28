@@ -446,6 +446,65 @@
       #notif-panel { right:8px; bottom:56px; width:calc(100vw - 16px); }
     }
 
+    /* ── CELEBRATION OVERLAY ── */
+    #celebration-overlay {
+      display:none; position:fixed; inset:0; z-index:2000;
+      pointer-events:none;
+      align-items:center; justify-content:center;
+    }
+    #celebration-overlay.active { display:flex; }
+
+    .celebration-card {
+      background:#fff; border-radius:28px;
+      box-shadow:0 20px 60px rgba(0,0,0,.18);
+      padding:36px 48px; text-align:center;
+      animation:celebPop .5s cubic-bezier(.34,1.56,.64,1) forwards;
+      pointer-events:none; position:relative; overflow:hidden;
+    }
+    @keyframes celebPop {
+      0%   { transform:scale(0.3) rotate(-8deg); opacity:0; }
+      60%  { transform:scale(1.08) rotate(2deg); opacity:1; }
+      80%  { transform:scale(0.96) rotate(-1deg); }
+      100% { transform:scale(1) rotate(0deg); opacity:1; }
+    }
+    .celebration-card.shake {
+      animation:celebPop .5s cubic-bezier(.34,1.56,.64,1) forwards,
+                shake .5s .55s ease-in-out;
+    }
+    @keyframes shake {
+      0%,100%{ transform:translateX(0); }
+      15%    { transform:translateX(-7px) rotate(-2deg); }
+      30%    { transform:translateX(7px) rotate(2deg); }
+      45%    { transform:translateX(-5px) rotate(-1deg); }
+      60%    { transform:translateX(5px) rotate(1deg); }
+      75%    { transform:translateX(-3px); }
+    }
+    .celebration-icon { font-size:72px; display:block; margin-bottom:10px;
+      animation:iconBounce .6s .4s cubic-bezier(.34,1.56,.64,1) both; }
+    @keyframes iconBounce {
+      0%   { transform:scale(0); }
+      70%  { transform:scale(1.2); }
+      100% { transform:scale(1); }
+    }
+    .celebration-title {
+      font-size:26px; font-weight:900; color:var(--theme-d);
+      margin-bottom:6px; line-height:1.2;
+    }
+    .celebration-sub {
+      font-size:15px; font-weight:700; color:var(--muted); line-height:1.5;
+    }
+    /* Confetti particles */
+    .confetti-piece {
+      position:fixed; width:10px; height:10px; border-radius:2px;
+      pointer-events:none; z-index:2001;
+      animation:confettiFall var(--dur,1.6s) var(--delay,0s) ease-in forwards;
+    }
+    @keyframes confettiFall {
+      0%   { transform:translateY(0) rotate(0deg) scale(1); opacity:1; }
+      80%  { opacity:1; }
+      100% { transform:translateY(100vh) rotate(720deg) scale(.5); opacity:0; }
+    }
+
     /* RESPONSIVE — mobile giữ layout ngang giống desktop, chỉ scale */
     @media(max-width:700px) {
       /* Room screen: giữ flex-row, sidebar thu nhỏ */
@@ -859,6 +918,15 @@
 <body>
 
 <!-- ══ NOTIFICATION LAYER ══ -->
+<!-- ── CELEBRATION OVERLAY ── -->
+<div id="celebration-overlay">
+  <div class="celebration-card" id="celebration-card">
+    <span class="celebration-icon" id="celebration-icon">🎉</span>
+    <div class="celebration-title" id="celebration-title">Tuyệt vời!</div>
+    <div class="celebration-sub" id="celebration-sub">Bạn đã học đủ 15 phút!</div>
+  </div>
+</div>
+
 <div id="notif-container"></div>
 <button id="notif-bell-btn" aria-label="Lịch sử thông báo">
   🔔 <span id="notif-badge" class="notif-badge">0</span>
@@ -1242,6 +1310,7 @@ let callUnsub     = null;
 let clockInterval = null;
 let mySeconds     = 0;
 let isRunning     = false;
+let _celebratedThisSession = false; // celebration flag — reset on each new study session
 let calYear, calMonth;
 let studyData     = {};
 // Clock realtime
@@ -1795,7 +1864,7 @@ function renderClocks() {
 
 function toggleClock() {
   if (isRunning) stopClock(true);
-  else startClock();
+  else { _celebratedThisSession = false; startClock(); }
 }
 
 async function startClock() {
@@ -2480,6 +2549,14 @@ function renderChatMsg(data, id) {
 
   const isMe = data.uid === currentUser?.uid;
   const profile = roomMembers[data.uid] || { name:'Bạn', avatarURL:'🐣' };
+
+  // INFO notification for incoming file/image/video messages
+  if (!isMe && typeof notify === 'function') {
+    const sender = profile.name || 'Bạn';
+    if      (data.type === 'image') notify(`${sender} đã gửi ảnh 🖼️`, 'info', '🖼️');
+    else if (data.type === 'video') notify(`${sender} đã gửi video 🎥`, 'info', '🎥');
+    else if (data.type === 'file')  notify(`${sender} đã gửi tệp 📎`, 'info', '📎');
+  }
 
   const wrapper = document.createElement('div');
   wrapper.className = 'chat-msg' + (isMe?' me':'');
@@ -3217,6 +3294,147 @@ function _refreshPanel() {
   });
 }
 
+/* ══════════════════════════════════════════
+   CELEBRATION SYSTEM
+══════════════════════════════════════════ */
+let _celebQueue    = [];
+let _celebRunning  = false;
+
+function showCelebration({ icon='🎉', title='Tuyệt vời!', sub='', onDone=null } = {}) {
+  _celebQueue.push({ icon, title, sub, onDone });
+  if (!_celebRunning) _runNextCeleb();
+}
+
+function _runNextCeleb() {
+  if (!_celebQueue.length) { _celebRunning = false; return; }
+  _celebRunning = true;
+  const { icon, title, sub, onDone } = _celebQueue.shift();
+
+  const overlay = document.getElementById('celebration-overlay');
+  const card    = document.getElementById('celebration-card');
+  document.getElementById('celebration-icon').textContent  = icon;
+  document.getElementById('celebration-title').textContent = title;
+  document.getElementById('celebration-sub').textContent   = sub;
+
+  // Re-trigger CSS animation via reflow
+  card.style.animation = 'none';
+  void card.offsetWidth;
+  card.style.animation = '';
+
+  overlay.classList.add('active');
+  _spawnConfetti();
+
+  setTimeout(() => {
+    overlay.classList.remove('active');
+    _cleanConfetti();
+    setTimeout(() => {
+      _celebRunning = false;
+      if (onDone) onDone();
+      _runNextCeleb();
+    }, 300);
+  }, 2200);
+}
+
+const _CONFETTI_COLORS = ['#58CC02','#1CB0F6','#FF4B4B','#FFC800','#9B59B6','#FF6B6B','#00BFA5','#E91E8C'];
+
+function _spawnConfetti() {
+  for (let i = 0; i < 60; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    const size = 7 + Math.random() * 9;
+    el.style.cssText = `
+      left:${Math.random()*100}vw; top:-12px;
+      width:${size}px; height:${size}px;
+      background:${_CONFETTI_COLORS[i % _CONFETTI_COLORS.length]};
+      border-radius:${Math.random()>.5?'50%':'2px'};
+      --dur:${1.2+Math.random()*1.2}s;
+      --delay:${Math.random()*.6}s;
+    `;
+    document.body.appendChild(el);
+  }
+}
+function _cleanConfetti() {
+  setTimeout(() => document.querySelectorAll('.confetti-piece').forEach(e=>e.remove()), 2500);
+}
+
+/* ── Streak ── */
+function calcStreak() {
+  if (!currentUser) return 0;
+  const myUid = currentUser.uid;
+  let streak = 0;
+  const today = new Date();
+  for (let i = 0; i < 365; i++) {
+    const d   = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if ((studyData[key]?.[myUid] || 0) >= 900) streak++;
+    else break;
+  }
+  return streak;
+}
+
+function updateStreakUI(streak) {
+  document.querySelectorAll('.streak-count').forEach(el => el.textContent = streak);
+  document.querySelectorAll('.streak-badge').forEach(el => {
+    el.textContent   = streak > 0 ? `🔥 ${streak} ngày` : '';
+    el.style.display = streak > 0 ? 'inline-flex' : 'none';
+  });
+}
+
+/* ── Trigger ── */
+function triggerStudyCelebration(totalSecs) {
+  const mins   = Math.floor(totalSecs / 60);
+  const streak = calcStreak();
+  let icon='🎉', title='Điểm danh thành công!', sub=`Bạn đã học ${mins} phút hôm nay!`;
+
+  if      (streak >= 30) { icon='🏆'; title=`Streak ${streak} ngày!`; sub='Thần đồng học tập! Không thể tin được 🔥'; }
+  else if (streak >= 14) { icon='💎'; title=`${streak} ngày liên tiếp!`; sub='Hai tuần không nghỉ — xuất sắc! 💪'; }
+  else if (streak >= 7)  { icon='🔥'; title=`Streak ${streak} ngày!`; sub='Một tuần chăm chỉ! Tiếp tục nhé!'; }
+  else if (streak >= 3)  { icon='⚡'; title=`${streak} ngày liên tiếp!`; sub='Đang có đà tốt! Giữ vững nhé 💪'; }
+  else if (streak >= 1)  { icon='🌱'; title='Điểm danh rồi!'; sub=`Học ${mins} phút hôm nay. Bắt đầu streak nào! 🔥`; }
+
+  showCelebration({ icon, title, sub, onDone: () => {
+    updateStreakUI(streak);
+    notify(`${title} — ${sub}`, 'success', icon);
+  }});
+}
+
+// Poll every 5s: detect first time crossing 15-min threshold this session
+setInterval(() => {
+  if (!isRunning || !currentRoomId || !currentUser || _celebratedThisSession) return;
+  const cd = remoteClocks[currentUser.uid] || {};
+  if (!cd.startedAt) return;
+  const startMs = cd.startedAt?.toMillis ? cd.startedAt.toMillis() : Number(cd.startedAt);
+  const elapsed = Math.floor((Date.now() - startMs) / 1000);
+  const total   = (cd.accumulated || 0) + elapsed;
+  if (total >= 900) {
+    _celebratedThisSession = true;
+    triggerStudyCelebration(total);
+  }
+}, 5000);
+
+// Reset celebration flag on each new session start — patch via toggleClock override
+const _origStartClock = startClock;
+
+// Wrap toggleClock to reset flag before starting
+function _toggleClockWithCeleb() {
+  if (isRunning) stopClock(true);
+  else { _celebratedThisSession = false; startClock(); }
+}
+
+// Patch renderClocks to use _toggleClockWithCeleb for play button
+// (renderClocks already calls toggleClock() — we override it globally)
+window.__origToggleClock = toggleClock;
+// Note: toggleClock is declared with `function` keyword so we can reassign via window in non-strict
+// In ES module strict mode, we patch the button listener in renderClocks instead.
+// We simply ensure _celebratedThisSession resets by hooking into startClock via the clock listener.
+// Already handled: the poll interval checks _celebratedThisSession before triggering.
+
+/* ── Extra INFO notifications for file messages — handled in renderChatMsg above ── */
+
+
+/* ══════════════════════════════════════════
+   NOTIF BELL & PANEL
+══════════════════════════════════════════ */
 document.getElementById('notif-bell-btn').addEventListener('click', e => {
   e.stopPropagation();
   _notifPanelOpen = !_notifPanelOpen;
@@ -3231,7 +3449,7 @@ document.getElementById('notif-clear').addEventListener('click', e => {
   _notifPanelOpen = false;
 });
 document.addEventListener('click', e => {
-  const bell = document.getElementById('notif-bell-btn');
+  const bell  = document.getElementById('notif-bell-btn');
   const panel = document.getElementById('notif-panel');
   if (bell && panel && !bell.contains(e.target) && !panel.contains(e.target)) {
     panel.classList.remove('open'); _notifPanelOpen = false;
