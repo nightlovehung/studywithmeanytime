@@ -345,39 +345,33 @@
     }
     .toast.show { transform:translateX(-50%) translateY(0); }
 
-    /* RESPONSIVE narrow */
+    /* RESPONSIVE — mobile giữ layout ngang giống desktop, chỉ scale */
     @media(max-width:700px) {
-      #screen-room { flex-direction:column; overflow-y:auto; height:auto; min-height:100vh; }
-      .room-sidebar { width:100%; min-width:unset; height:auto; border-right:none; border-bottom:2px solid var(--border); flex-shrink:0; }
-      .calendar-wrap { max-height:240px; }
-      .chat-section { height:200px; flex-shrink:0; }
-      .room-main { flex:none; display:flex; flex-direction:column; }
-      .clocks-section { padding:12px 16px; flex-shrink:0; }
-      .clock-card { min-width:120px; }
-      /* Video placeholder phải có chiều cao cố định trên mobile */
-      .video-placeholder { flex:none; height:200px; margin:12px; }
-
-      /* Video call screen mobile: strip trên, main dưới */
-      #screen-call { flex-direction:column; }
-      .call-strip {
-        flex-direction:row !important;
-        height:80px !important;
-        overflow-x:auto !important; overflow-y:hidden !important;
-        border-right:none !important; border-bottom:2px solid rgba(255,255,255,.1);
-        flex-shrink:0;
-      }
-      .call-thumb { min-width:80px !important; height:64px !important; }
-      .call-main-video { flex:1; min-height:0; }
-      .call-controls { padding:10px; gap:10px; }
-      .ctrl-btn { width:44px; height:44px; font-size:18px; }
-      .ctrl-btn.end { width:52px; height:52px; font-size:22px; }
+      /* Room screen: giữ flex-row, sidebar thu nhỏ */
+      #screen-room { flex-direction:row; height:100dvh; overflow:hidden; }
+      .room-sidebar { width:220px; min-width:180px; }
+      .calendar-wrap { max-height:200px; }
+      .chat-section { height:180px; }
+      .clocks-section { padding:10px 12px; }
+      .clock-card { min-width:100px; padding:10px; }
+      .clock-time { font-size:17px; }
+      .clock-name { font-size:11px; }
+      .room-topbar { padding:8px 10px; gap:6px; }
+      .room-topbar .room-name-label { font-size:13px; }
+      #room-member-count { font-size:10px; padding:2px 6px; }
+      .video-placeholder { margin:10px; border-radius:14px; }
+      /* Video call mobile: giữ landscape, strip nằm dọc bên trái */
+      #screen-call { flex-direction:row; }
+      .call-strip { flex-direction:column; width:80px; overflow-y:auto; overflow-x:hidden; }
+      .call-thumb { width:72px; min-width:72px; height:56px; }
+      .ctrl-btn { width:42px; height:42px; font-size:18px; }
+      .ctrl-btn.end { width:50px; height:50px; font-size:20px; }
     }
     @media(max-width:480px) {
-      .home-card { padding:24px 16px; }
-      .modal { padding:24px 18px; }
-      .room-topbar { padding:10px 12px; gap:6px; }
-      .room-topbar .room-name-label { font-size:14px; }
-      #room-member-count { font-size:11px; padding:2px 8px; }
+      .room-sidebar { width:170px; min-width:150px; }
+      .home-card { padding:20px 14px; }
+      .modal { padding:20px 16px; }
+      .cal-day { font-size:11px; border-radius:7px; }
     }
 
     /* ── CHAT ── */
@@ -600,7 +594,6 @@
       padding:12px 16px; background:rgba(0,0,0,.4);
     }
     .call-room-name { flex:1; color:#fff; font-weight:900; font-size:15px; }
-    .call-timer { color:#7fc87f; font-weight:800; font-size:14px; font-family:monospace; }
 
     /* Main video */
     .call-main-video {
@@ -941,8 +934,7 @@
 <div id="screen-call">
   <div class="call-topbar">
     <span class="call-room-name" id="call-room-name">Phòng học</span>
-    <span class="call-timer" id="call-timer">00:00</span>
-    <button class="icon-btn" style="color:#fff;font-size:20px" id="btn-call-back" title="Thu nhỏ">✕</button>
+    <button class="icon-btn" style="color:#fff;font-size:20px" id="btn-call-back" title="Kết thúc">✕</button>
   </div>
 
   <!-- main video -->
@@ -1010,7 +1002,6 @@ let studyData     = {};
 // WebRTC
 let localStream   = null;
 let peerConns     = {};       // uid → RTCPeerConnection
-let callTimerInt  = null;
 let callSeconds   = 0;
 let micOn = true, camOn = true;
 let facingMode = 'user';
@@ -1726,8 +1717,10 @@ document.getElementById('btn-save-edit-avatar').addEventListener('click', async(
 // Đăng xuất
 async function doLogout() {
   stopClock(false);
+  endCall(true);
   if (roomUnsub) { roomUnsub(); roomUnsub=null; }
   if (chatUnsub) { chatUnsub(); chatUnsub=null; }
+  if (callUnsub) { callUnsub(); callUnsub=null; }
   currentUser=null; userProfile=null; currentRoomId=null; roomMembers={};
   document.getElementById('user-menu').classList.remove('open');
   await signOut(auth);
@@ -2110,43 +2103,69 @@ async function doDeleteRoom() {
 
 /* ══════════════════════════════════════════
    VIDEO CALL  (WebRTC + Firestore signaling)
+   Dùng participants/{uid} thay vì active boolean
+   → tự động hết hạn khi mọi người đều out
 ══════════════════════════════════════════ */
 const ICE_SERVERS = { iceServers:[
   {urls:'stun:stun.l.google.com:19302'},
   {urls:'stun:stun1.l.google.com:19302'}
 ]};
 
+// Gọi khi vào phòng: lắng nghe participants để hiện incoming call
 function listenCall(roomId) {
   if (callUnsub) { callUnsub(); callUnsub=null; }
-  callUnsub = onSnapshot(doc(db,'rooms',roomId,'call','status'), snap=>{
-    if (!snap.exists()) return;
-    const data = snap.data();
-    if (!data.active) { document.getElementById('call-incoming').classList.remove('active'); return; }
-    if (!document.getElementById('screen-call').classList.contains('active')) {
-      if (data.startedBy !== currentUser.uid) {
-        const caller = roomMembers[data.startedBy];
-        const avEl = document.getElementById('incoming-caller-av');
-        if (caller?.avatarURL?.startsWith('data:')) {
-          avEl.innerHTML = `<img src="${caller.avatarURL}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--green);display:block;margin:0 auto">`;
-          avEl.style.fontSize = '0';
-        } else {
-          avEl.innerHTML = '';
-          avEl.textContent = caller?.avatarURL || '📹';
-          avEl.style.fontSize = '';
-        }
-        document.getElementById('incoming-caller-name').textContent = caller?.name||'Bạn bè';
-        document.getElementById('call-incoming').classList.add('active');
+  callUnsub = onSnapshot(collection(db,'rooms',roomId,'callParticipants'), snap=>{
+    const participants = {};
+    snap.forEach(d=>{ participants[d.id]=d.data(); });
+
+    const inCall = document.getElementById('screen-call').classList.contains('active');
+    const incoming = document.getElementById('call-incoming');
+
+    // Không có ai đang gọi → ẩn overlay
+    const othersInCall = Object.entries(participants).filter(([uid])=>uid!==currentUser?.uid);
+    if (othersInCall.length === 0) {
+      incoming.classList.remove('active');
+      // Nếu đang trong call mà không còn ai → tự end
+      if (inCall && Object.keys(participants).length === 0) endCall(false);
+      return;
+    }
+
+    // Có người khác đang call, mình chưa trong call → hiện incoming
+    if (!inCall) {
+      const [callerUid, callerData] = othersInCall[0];
+      const caller = roomMembers[callerUid] || callerData;
+      const avEl = document.getElementById('incoming-caller-av');
+      if (caller?.avatarURL?.startsWith('data:')) {
+        avEl.innerHTML = `<img src="${caller.avatarURL}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--green);display:block;margin:0 auto">`;
+        avEl.style.fontSize = '0';
+      } else {
+        avEl.innerHTML = '';
+        avEl.textContent = caller?.avatarURL || '📹';
+        avEl.style.fontSize = '';
       }
+      document.getElementById('incoming-caller-name').textContent = caller?.name || 'Bạn bè';
+      incoming.classList.add('active');
+    }
+
+    // Nếu đang trong call → cập nhật strip (ai vào/ra)
+    if (inCall) {
+      // Xóa thumb của người đã out
+      document.querySelectorAll('.call-thumb').forEach(th=>{
+        const uid = th.id.replace('thumb-','');
+        if (uid !== currentUser.uid && !participants[uid]) th.remove();
+      });
     }
   });
 }
 
 document.getElementById('video-placeholder').addEventListener('click', ()=> startCall(true));
 document.getElementById('btn-accept-call').addEventListener('click', ()=>{
-  document.getElementById('call-incoming').classList.remove('active'); startCall(false);
+  document.getElementById('call-incoming').classList.remove('active');
+  startCall(false);
 });
 document.getElementById('btn-decline-call').addEventListener('click', ()=>{
-  document.getElementById('call-incoming').classList.remove('active'); toast('Đã từ chối cuộc gọi');
+  document.getElementById('call-incoming').classList.remove('active');
+  toast('Đã từ chối cuộc gọi');
 });
 
 async function startCall(initiator) {
@@ -2156,32 +2175,41 @@ async function startCall(initiator) {
     catch(e2) { toast('Không thể truy cập camera/mic 😔'); return; }
   }
 
-  // Detect xem có nhiều camera không (điện thoại) → hiện nút flip
+  // Detect nhiều camera → hiện nút flip
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cameras = devices.filter(d=>d.kind==='videoinput');
     document.getElementById('ctrl-flip').style.display = cameras.length > 1 ? '' : 'none';
   } catch(e) { document.getElementById('ctrl-flip').style.display = 'none'; }
-  if (initiator) {
-    await setDoc(doc(db,'rooms',currentRoomId,'call','status'),{
-      active:true, startedBy:currentUser.uid, startedAt:serverTimestamp()
-    });
-  }
+
+  // Ghi mình vào participants
+  await setDoc(doc(db,'rooms',currentRoomId,'callParticipants',currentUser.uid),{
+    uid: currentUser.uid,
+    name: userProfile.name,
+    avatarURL: userProfile.avatarURL,
+    joinedAt: serverTimestamp()
+  });
+
   micOn=true; camOn=true; updateCtrlBtns();
   document.getElementById('screen-call').classList.add('active');
   document.getElementById('call-room-name').textContent = currentRoomData?.name||'Phòng học';
-  callSeconds=0;
-  if (callTimerInt) clearInterval(callTimerInt);
-  callTimerInt = setInterval(()=>{
-    callSeconds++;
-    const m=Math.floor(callSeconds/60),s=callSeconds%60;
-    document.getElementById('call-timer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-  },1000);
   showLocalInMain();
   renderCallStrip();
   const others = Object.keys(roomMembers).filter(u=>u!==currentUser.uid);
   for (const uid of others) await createPeer(uid, initiator);
   listenSignal();
+}
+
+// endCall(notify=true): notify=false khi bị gọi tự động (room bị xóa, v.v.)
+function endCall(notify=true) {
+  if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  Object.values(peerConns).forEach(pc=>pc.close()); peerConns={};
+  document.getElementById('screen-call').classList.remove('active');
+  document.getElementById('call-incoming').classList.remove('active');
+  // Xóa mình khỏi participants → người khác sẽ thấy ngay
+  if (currentRoomId && currentUser && notify) {
+    deleteDoc(doc(db,'rooms',currentRoomId,'callParticipants',currentUser.uid)).catch(()=>{});
+  }
 }
 
 function showLocalInMain() {
@@ -2337,16 +2365,8 @@ document.getElementById('ctrl-flip').addEventListener('click', async ()=>{
     showLocalInMain();
   } catch(e) { toast('Không thể đổi camera 😔'); }
 });
-document.getElementById('ctrl-end').addEventListener('click', endCall);
-document.getElementById('btn-call-back').addEventListener('click', endCall);
-
-function endCall() {
-  if (callTimerInt) { clearInterval(callTimerInt); callTimerInt=null; }
-  if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
-  Object.values(peerConns).forEach(pc=>pc.close()); peerConns={};
-  document.getElementById('screen-call').classList.remove('active');
-  if (currentRoomId) setDoc(doc(db,'rooms',currentRoomId,'call','status'),{active:false},{merge:true});
-}
+document.getElementById('ctrl-end').addEventListener('click', ()=>endCall(true));
+document.getElementById('btn-call-back').addEventListener('click', ()=>endCall(true));
 
 function updateCtrlBtns() {
   document.getElementById('ctrl-mic').textContent=micOn?'🎙️':'🔇';
