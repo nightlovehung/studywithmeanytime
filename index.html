@@ -360,10 +360,23 @@
       .room-topbar .room-name-label { font-size:13px; }
       #room-member-count { font-size:10px; padding:2px 6px; }
       .video-placeholder { margin:10px; border-radius:14px; }
-      /* Video call mobile: giữ landscape, strip nằm dọc bên trái */
-      #screen-call { flex-direction:row; }
-      .call-strip { flex-direction:column; width:80px; overflow-y:auto; overflow-x:hidden; }
-      .call-thumb { width:72px; min-width:72px; height:56px; }
+      /* Video call mobile: portrait, strip ngang full-width ở dưới */
+      #screen-call { flex-direction:column; }
+      .call-strip {
+        flex-direction:row;
+        width:100%;
+        overflow-x:auto;
+        overflow-y:hidden;
+        padding:8px 10px;
+        height:auto;
+      }
+      /* Thumbs chia đều khi ít người, scroll khi nhiều người */
+      .call-thumb {
+        flex:1 0 72px;   /* grow để lấp đầy, shrink không co dưới 72px */
+        max-width:120px; /* không quá to khi ít người */
+        min-width:72px;
+        height:60px;
+      }
       .ctrl-btn { width:42px; height:42px; font-size:18px; }
       .ctrl-btn.end { width:50px; height:50px; font-size:20px; }
     }
@@ -372,6 +385,7 @@
       .home-card { padding:20px 14px; }
       .modal { padding:20px 16px; }
       .cal-day { font-size:11px; border-radius:7px; }
+      .call-thumb { flex:1 0 64px; min-width:64px; max-width:100px; height:54px; }
     }
 
     /* ── CHAT ── */
