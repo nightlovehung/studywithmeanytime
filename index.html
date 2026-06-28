@@ -663,6 +663,8 @@
   <span style="font-size:52px">🦉</span>
   <div class="spinner"></div>
   <p>Đang tải...</p>
+  <p id="loading-error" style="font-size:12px;color:#e74c3c;margin-top:8px;max-width:300px;text-align:center;padding:0 16px"></p>
+  <p id="loading-hint" style="font-size:11px;color:#aaa;margin-top:4px"></p>
 </div>
 
 <!-- ══ LOGIN ══ -->
@@ -1013,14 +1015,39 @@ function showScreen(id) {
   document.getElementById('screen-loading').style.display = 'none';
 }
 
+// Countdown hiển thị trên loading screen
+let _countdown = 8;
+const _cdInterval = setInterval(() => {
+  _countdown--;
+  const hint = document.getElementById('loading-hint');
+  if (hint) hint.textContent = _countdown > 0 ? `Tự động chuyển sau ${_countdown}s nếu kẹt...` : '';
+  if (_countdown <= 0) clearInterval(_cdInterval);
+}, 1000);
+
 // Fallback: nếu Firebase không phản hồi sau 8s → hiện màn login
 setTimeout(() => {
+  clearInterval(_cdInterval);
   const loading = document.getElementById('screen-loading');
   if (loading && loading.style.display !== 'none') {
     showScreen('screen-login');
     console.warn('Firebase timeout — showing login screen');
   }
 }, 8000);
+
+// Hiện lỗi trực tiếp trên màn hình loading để debug không cần F12
+window.addEventListener('error', e => {
+  const p = document.getElementById('loading-error');
+  if (p) p.textContent = '❌ ' + e.message;
+});
+window.addEventListener('unhandledrejection', e => {
+  const p = document.getElementById('loading-error');
+  if (p) p.textContent = '❌ ' + (e.reason?.message || e.reason || 'Lỗi không xác định');
+  // Nếu lỗi xảy ra trong lúc loading → thoát về login
+  const loading = document.getElementById('screen-loading');
+  if (loading && loading.style.display !== 'none') {
+    setTimeout(() => showScreen('screen-login'), 2000);
+  }
+});
 function toast(msg, dur=2800) {
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('show');
@@ -2127,7 +2154,6 @@ const ICE_SERVERS = { iceServers:[
 
 let callInviteUnsub = null;  // listener invite
 let callPartUnsub   = null;  // listener participants (chỉ khi đang trong call)
-let facingMode      = 'user';
 
 // ── Gọi khi vào phòng: chỉ lắng nghe invite ──
 function listenCall(roomId) {
