@@ -347,9 +347,37 @@
 
     /* RESPONSIVE narrow */
     @media(max-width:700px) {
-      #screen-room { flex-direction:column; }
-      .room-sidebar { width:100%; min-width:unset; height:auto; border-right:none; border-bottom:2px solid var(--border); }
-      .calendar-wrap { max-height:280px; }
+      #screen-room { flex-direction:column; overflow-y:auto; height:auto; min-height:100vh; }
+      .room-sidebar { width:100%; min-width:unset; height:auto; border-right:none; border-bottom:2px solid var(--border); flex-shrink:0; }
+      .calendar-wrap { max-height:240px; }
+      .chat-section { height:200px; flex-shrink:0; }
+      .room-main { flex:none; display:flex; flex-direction:column; }
+      .clocks-section { padding:12px 16px; flex-shrink:0; }
+      .clock-card { min-width:120px; }
+      /* Video placeholder phải có chiều cao cố định trên mobile */
+      .video-placeholder { flex:none; height:200px; margin:12px; }
+
+      /* Video call screen mobile: strip trên, main dưới */
+      #screen-call { flex-direction:column; }
+      .call-strip {
+        flex-direction:row !important;
+        height:80px !important;
+        overflow-x:auto !important; overflow-y:hidden !important;
+        border-right:none !important; border-bottom:2px solid rgba(255,255,255,.1);
+        flex-shrink:0;
+      }
+      .call-thumb { min-width:80px !important; height:64px !important; }
+      .call-main-video { flex:1; min-height:0; }
+      .call-controls { padding:10px; gap:10px; }
+      .ctrl-btn { width:44px; height:44px; font-size:18px; }
+      .ctrl-btn.end { width:52px; height:52px; font-size:22px; }
+    }
+    @media(max-width:480px) {
+      .home-card { padding:24px 16px; }
+      .modal { padding:24px 18px; }
+      .room-topbar { padding:10px 12px; gap:6px; }
+      .room-topbar .room-name-label { font-size:14px; }
+      #room-member-count { font-size:11px; padding:2px 8px; }
     }
 
     /* ── CHAT ── */
@@ -753,6 +781,7 @@
     <!-- topbar -->
     <div class="room-topbar">
       <span class="room-name-label" id="room-name-display">Phòng học</span>
+      <span id="room-member-count" style="font-size:12px;font-weight:800;color:var(--muted);background:#f0fdf4;border:1.5px solid var(--border);border-radius:20px;padding:3px 10px;white-space:nowrap">0/12</span>
       <button class="icon-btn" id="btn-copy-code" title="Sao chép mã phòng">📋</button>
       <!-- manage menu -->
       <div class="manage-menu-wrap">
@@ -770,6 +799,7 @@
         <div class="user-menu-dropdown" id="user-menu">
           <button id="menu-home">🏠 Trang chủ</button>
           <button id="menu-edit-name">✏️ Chỉnh sửa tên</button>
+          <button id="menu-edit-avatar">🖼️ Đổi avatar</button>
           <button id="menu-logout" style="color:#e74c3c">🚪 Đăng xuất</button>
         </div>
       </div>
@@ -828,6 +858,26 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" id="btn-cancel-editname">Huỷ</button>
       <button class="btn btn-green" id="btn-save-editname">Lưu ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- edit avatar modal -->
+<div class="modal-overlay" id="modal-edit-avatar">
+  <div class="modal">
+    <h3>🖼️ Đổi avatar</h3>
+    <p>Chọn ảnh mới hoặc emoji có sẵn</p>
+    <div class="avatar-picker" id="edit-avatar-picker-btn" style="margin:0 auto 16px">
+      <div class="avatar-placeholder" id="edit-avatar-placeholder">🐣</div>
+      <img id="edit-avatar-img" src="" alt="" style="display:none;width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid var(--border);" />
+      <div class="avatar-edit-badge">✏️</div>
+    </div>
+    <input type="file" id="edit-avatar-file" accept="image/*" style="display:none" />
+    <div class="avatar-or-divider">hoặc chọn avatar có sẵn</div>
+    <div class="default-avatar-grid" id="edit-avatar-grid"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btn-cancel-edit-avatar">Huỷ</button>
+      <button class="btn btn-green" id="btn-save-edit-avatar">Lưu avatar ✓</button>
     </div>
   </div>
 </div>
@@ -913,7 +963,7 @@
     <button class="ctrl-btn" id="ctrl-mic" title="Tắt/bật mic">🎙️</button>
     <button class="ctrl-btn" id="ctrl-cam" title="Tắt/bật camera">📷</button>
     <button class="ctrl-btn end" id="ctrl-end" title="Kết thúc cuộc gọi">📵</button>
-    <button class="ctrl-btn" id="ctrl-flip" title="Đổi camera (di động)">🔄</button>
+    <button class="ctrl-btn" id="ctrl-flip" title="Đổi camera trước/sau" style="display:none">🔄</button>
   </div>
 </div>
 
@@ -1110,7 +1160,24 @@ document.getElementById('btn-start').addEventListener('click', async ()=>{
 async function renderHome() {
   if (!userProfile) return;
   const wrap = document.getElementById('home-avatar-wrap');
-  wrap.innerHTML=''; wrap.appendChild(mkAv(userProfile.avatarURL,52));
+  wrap.innerHTML='';
+  const av = mkAv(userProfile.avatarURL,52);
+  av.style.cursor='pointer';
+  av.title='Đổi avatar';
+  av.addEventListener('click',()=>{
+    editAvatarDataURL=null; editAvatarEmoji=null;
+    document.getElementById('edit-avatar-img').style.display='none';
+    const ph=document.getElementById('edit-avatar-placeholder');
+    ph.style.display='flex';
+    if (userProfile.avatarURL?.startsWith('data:')) {
+      document.getElementById('edit-avatar-img').src=userProfile.avatarURL;
+      document.getElementById('edit-avatar-img').style.display='block';
+      ph.style.display='none';
+    } else { ph.textContent=userProfile.avatarURL||'🐣'; }
+    document.querySelectorAll('#edit-avatar-grid .emoji-av-btn').forEach(b=>b.classList.remove('selected'));
+    openModal('modal-edit-avatar');
+  });
+  wrap.appendChild(av);
   document.getElementById('home-username').textContent = userProfile.name;
   await loadRooms();
 }
@@ -1193,6 +1260,9 @@ document.getElementById('btn-join-room').addEventListener('click', async ()=>{
     if ((rd.members||[]).includes(currentUser.uid)) {
       toast('Bạn đã trong phòng này rồi!'); closeModal('modal-room'); enterRoom(code,rd.name); return;
     }
+    if ((rd.members||[]).length >= 12) {
+      toast('Phòng này đã đủ 12 người rồi! 😅'); return;
+    }
     await updateDoc(doc(db,'rooms',code),{members:arrayUnion(currentUser.uid)});
     userProfile.rooms=[...(userProfile.rooms||[]),code];
     await updateDoc(doc(db,'users',currentUser.uid),{rooms:arrayUnion(code)});
@@ -1242,12 +1312,58 @@ async function enterRoom(roomId, roomName) {
     if (s.exists()) roomMembers[uid]=s.data();
   }));
 
+  // 🔄 REALTIME: lắng nghe room doc để cập nhật members ngay khi có người join/rời/bị kick
+  if (roomUnsub) { roomUnsub(); roomUnsub=null; }
+  roomUnsub = onSnapshot(doc(db,'rooms',roomId), async snap=>{
+    if (!snap.exists()) {
+      // Phòng bị xóa
+      toast('Phòng học đã bị xóa 😢');
+      stopClock(false);
+      showScreen('screen-home');
+      return;
+    }
+    const rd = snap.data();
+    currentRoomData = rd;
+    const newMembers = rd.members||[];
+
+    // Phát hiện bị kick: currentUser không còn trong members
+    if (!newMembers.includes(currentUser.uid)) {
+      toast('Bạn đã bị kick khỏi phòng 😢');
+      stopClock(false);
+      if (chatUnsub) { chatUnsub(); chatUnsub=null; }
+      if (callUnsub) { callUnsub(); callUnsub=null; }
+      if (localStream) { localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+      document.getElementById('screen-call').classList.remove('active');
+      // Xóa phòng khỏi userProfile local
+      userProfile.rooms = (userProfile.rooms||[]).filter(r=>r!==roomId);
+      currentRoomId = null;
+      showScreen('screen-home');
+      await loadRooms();
+      return;
+    }
+
+    // Load profile cho member mới chưa có
+    await Promise.all(newMembers.map(async uid=>{
+      if (!roomMembers[uid]) {
+        const s=await getDoc(doc(db,'users',uid));
+        if (s.exists()) roomMembers[uid]=s.data();
+      }
+    }));
+    // Xóa member đã rời/bị kick khỏi roomMembers
+    Object.keys(roomMembers).forEach(uid=>{
+      if (!newMembers.includes(uid)) delete roomMembers[uid];
+    });
+    renderClocks(); // Cập nhật đồng hồ + member count ngay
+  });
+
   // đồng hồ local luôn bắt đầu từ 0 mỗi phiên
   mySeconds = 0;
   lastAutoSaved = 0;
 
   // realtime listener on all study days for calendar
-  roomUnsub = onSnapshot(collection(db,'rooms',roomId,'studyDays'), snap=>{
+  let studyUnsub = null;
+  if (studyUnsub) { studyUnsub(); studyUnsub=null; }
+  studyUnsub = onSnapshot(collection(db,'rooms',roomId,'studyDays'), snap=>{
     studyData={};
     snap.forEach(d=>{ studyData[d.id]=d.data(); });
     renderCalendar();
@@ -1266,9 +1382,15 @@ async function enterRoom(roomId, roomName) {
 /* ══════════════════════════════════════════
    CLOCKS
 ══════════════════════════════════════════ */
+function updateMemberCount() {
+  const el = document.getElementById('room-member-count');
+  if (el) el.textContent = Object.keys(roomMembers).length + '/12';
+}
+
 function renderClocks() {
   const row=document.getElementById('clocks-row');
   row.innerHTML='';
+  updateMemberCount();
   const tk=todayKey();
   const todayData=studyData[tk]||{};
 
@@ -1290,11 +1412,14 @@ function renderClocks() {
       avDiv.appendChild(img);
     } else { avDiv.textContent=profile.avatarURL||'🐣'; }
 
-    card.innerHTML=`
-      <div class="clock-name">${profile.name||'Bạn'}</div>
-      <div class="clock-time" id="clocktime-${uid}">${fmtTime(secs)}</div>
-    `;
-    card.insertBefore(avDiv, card.firstChild);
+    const nameDiv=document.createElement('div');
+    nameDiv.className='clock-name'; nameDiv.textContent=profile.name||'Bạn';
+    const timeDiv=document.createElement('div');
+    timeDiv.className='clock-time'; timeDiv.id='clocktime-'+uid; timeDiv.textContent=fmtTime(secs);
+
+    card.appendChild(avDiv);
+    card.appendChild(nameDiv);
+    card.appendChild(timeDiv);
 
     if (isMe) {
       const playBtn=document.createElement('button');
@@ -1506,6 +1631,97 @@ document.getElementById('menu-edit-name').addEventListener('click',()=>{
   openModal('modal-editname');
 });
 document.getElementById('btn-cancel-editname').addEventListener('click',()=>closeModal('modal-editname'));
+
+/* ══════════════════════════════════════════
+   ĐỔI AVATAR
+══════════════════════════════════════════ */
+let editAvatarDataURL = null;
+let editAvatarEmoji   = null;
+
+// Render grid emoji cho modal đổi avatar
+(function buildEditAvatarGrid(){
+  const grid = document.getElementById('edit-avatar-grid');
+  DEFAULT_AVATARS.forEach(em=>{
+    const btn=document.createElement('button');
+    btn.className='emoji-av-btn'; btn.textContent=em;
+    btn.addEventListener('click',()=>{
+      editAvatarDataURL=null; editAvatarEmoji=em;
+      document.getElementById('edit-avatar-img').style.display='none';
+      document.getElementById('edit-avatar-placeholder').style.display='flex';
+      document.getElementById('edit-avatar-placeholder').textContent=em;
+      document.querySelectorAll('#edit-avatar-grid .emoji-av-btn').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+    grid.appendChild(btn);
+  });
+})();
+
+document.getElementById('edit-avatar-picker-btn').addEventListener('click',()=>document.getElementById('edit-avatar-file').click());
+document.getElementById('edit-avatar-file').addEventListener('change', e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=200, canvas=document.createElement('canvas');
+      const sc=Math.min(MAX/img.width,MAX/img.height,1);
+      canvas.width=Math.round(img.width*sc); canvas.height=Math.round(img.height*sc);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      editAvatarDataURL=canvas.toDataURL('image/jpeg',.7); editAvatarEmoji=null;
+      const prevImg=document.getElementById('edit-avatar-img');
+      prevImg.src=editAvatarDataURL; prevImg.style.display='block';
+      document.getElementById('edit-avatar-placeholder').style.display='none';
+      document.querySelectorAll('#edit-avatar-grid .emoji-av-btn').forEach(b=>b.classList.remove('selected'));
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+});
+
+document.getElementById('menu-edit-avatar').addEventListener('click',()=>{
+  document.getElementById('user-menu').classList.remove('open');
+  // Reset state
+  editAvatarDataURL=null; editAvatarEmoji=null;
+  document.getElementById('edit-avatar-img').style.display='none';
+  const ph=document.getElementById('edit-avatar-placeholder');
+  ph.style.display='flex';
+  if (userProfile.avatarURL?.startsWith('data:')) {
+    document.getElementById('edit-avatar-img').src=userProfile.avatarURL;
+    document.getElementById('edit-avatar-img').style.display='block';
+    ph.style.display='none';
+  } else {
+    ph.textContent=userProfile.avatarURL||'🐣';
+  }
+  document.querySelectorAll('#edit-avatar-grid .emoji-av-btn').forEach(b=>b.classList.remove('selected'));
+  openModal('modal-edit-avatar');
+});
+
+document.getElementById('btn-cancel-edit-avatar').addEventListener('click',()=>closeModal('modal-edit-avatar'));
+document.getElementById('btn-save-edit-avatar').addEventListener('click', async()=>{
+  const newAvatar = editAvatarDataURL || editAvatarEmoji;
+  if (!newAvatar) { toast('Chọn avatar mới trước nhé!'); return; }
+  const btn=document.getElementById('btn-save-edit-avatar');
+  btn.textContent='Đang lưu...'; btn.disabled=true;
+  try {
+    await updateDoc(doc(db,'users',currentUser.uid),{ avatarURL: newAvatar });
+    userProfile.avatarURL=newAvatar;
+    if (roomMembers[currentUser.uid]) roomMembers[currentUser.uid].avatarURL=newAvatar;
+    // Cập nhật UI
+    const homeWrap=document.getElementById('home-avatar-wrap');
+    homeWrap.innerHTML=''; homeWrap.appendChild(mkAv(newAvatar,52));
+    const roomWrap=document.getElementById('room-avatar-wrap');
+    if (roomWrap) {
+      roomWrap.innerHTML='';
+      const av=mkAv(newAvatar,38); av.style.cursor='pointer';
+      av.addEventListener('click',()=>document.getElementById('user-menu').classList.toggle('open'));
+      roomWrap.appendChild(av);
+    }
+    renderClocks();
+    closeModal('modal-edit-avatar'); toast('Đã cập nhật avatar! 🎨');
+  } catch(e) { toast('Lỗi: '+e.message); }
+  finally { btn.textContent='Lưu avatar ✓'; btn.disabled=false; }
+});
 
 // Đăng xuất
 async function doLogout() {
@@ -1774,8 +1990,11 @@ document.getElementById('menu-members').addEventListener('click', async ()=>{
     row.className = 'member-row';
     const isMe = uid === currentUser.uid;
     const isRoomOwner = uid === currentRoomData?.createdBy;
+    const avHtml = profile.avatarURL?.startsWith('data:')
+      ? `<img src="${profile.avatarURL}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--green);flex-shrink:0">`
+      : `<div style="font-size:28px;width:36px;text-align:center;flex-shrink:0">${profile.avatarURL||'🐣'}</div>`;
     row.innerHTML=`
-      <div style="font-size:28px;width:36px;text-align:center">${profile.avatarURL?.startsWith('data:')?'🙂':profile.avatarURL||'🐣'}</div>
+      ${avHtml}
       <div class="member-info">
         <div class="member-name">${profile.name}${isMe?' (Bạn)':''}</div>
         <div class="member-tag">${isRoomOwner?'👑 Chủ phòng':'Thành viên'}</div>
@@ -1906,8 +2125,15 @@ function listenCall(roomId) {
     if (!document.getElementById('screen-call').classList.contains('active')) {
       if (data.startedBy !== currentUser.uid) {
         const caller = roomMembers[data.startedBy];
-        document.getElementById('incoming-caller-av').textContent =
-          caller?.avatarURL?.startsWith('data:') ? '📹' : (caller?.avatarURL||'📹');
+        const avEl = document.getElementById('incoming-caller-av');
+        if (caller?.avatarURL?.startsWith('data:')) {
+          avEl.innerHTML = `<img src="${caller.avatarURL}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--green);display:block;margin:0 auto">`;
+          avEl.style.fontSize = '0';
+        } else {
+          avEl.innerHTML = '';
+          avEl.textContent = caller?.avatarURL || '📹';
+          avEl.style.fontSize = '';
+        }
         document.getElementById('incoming-caller-name').textContent = caller?.name||'Bạn bè';
         document.getElementById('call-incoming').classList.add('active');
       }
@@ -1929,6 +2155,13 @@ async function startCall(initiator) {
     try { localStream = await navigator.mediaDevices.getUserMedia({ video:false, audio:true }); }
     catch(e2) { toast('Không thể truy cập camera/mic 😔'); return; }
   }
+
+  // Detect xem có nhiều camera không (điện thoại) → hiện nút flip
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter(d=>d.kind==='videoinput');
+    document.getElementById('ctrl-flip').style.display = cameras.length > 1 ? '' : 'none';
+  } catch(e) { document.getElementById('ctrl-flip').style.display = 'none'; }
   if (initiator) {
     await setDoc(doc(db,'rooms',currentRoomId,'call','status'),{
       active:true, startedBy:currentUser.uid, startedAt:serverTimestamp()
@@ -1958,10 +2191,16 @@ function showLocalInMain() {
     mv.srcObject=localStream; mv.style.display='block'; ph.style.display='none';
   } else {
     mv.style.display='none'; ph.style.display='flex';
-    document.getElementById('main-video-av').textContent=userProfile.avatarURL?.startsWith('data:')?'🐣':(userProfile.avatarURL||'🐣');
-    document.getElementById('main-video-name').textContent=userProfile.name;
+    const avEl = document.getElementById('main-video-av');
+    // Hiện avatar upload nếu có, ngược lại dùng emoji
+    if (userProfile.avatarURL?.startsWith('data:')) {
+      avEl.innerHTML = `<img src="${userProfile.avatarURL}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.3)">`;
+    } else {
+      avEl.textContent = userProfile.avatarURL || '🐣';
+    }
+    document.getElementById('main-video-name').textContent = userProfile.name;
   }
-  document.getElementById('main-video-label').textContent=userProfile.name+' (Bạn)';
+  document.getElementById('main-video-label').textContent = userProfile.name+' (Bạn)';
 }
 
 function renderCallStrip() {
@@ -1986,7 +2225,11 @@ function makeThumb(uid,profile,stream,isLocal) {
     v.style.cssText='width:100%;height:100%;object-fit:cover;'; th.appendChild(v);
   } else {
     const av=document.createElement('div'); av.className='call-thumb-av';
-    av.textContent=profile.avatarURL?.startsWith('data:')?'🐣':(profile.avatarURL||'🐣');
+    if (profile.avatarURL?.startsWith('data:')) {
+      av.innerHTML=`<img src="${profile.avatarURL}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">`;
+    } else {
+      av.textContent=profile.avatarURL||'🐣';
+    }
     th.appendChild(av);
   }
   const lbl=document.createElement('div'); lbl.className='call-thumb-label';
@@ -2006,7 +2249,12 @@ function switchMain(uid) {
     mv.srcObject=stream; mv.muted=(uid===currentUser.uid); mv.style.display='block'; ph.style.display='none';
   } else {
     mv.style.display='none'; ph.style.display='flex';
-    document.getElementById('main-video-av').textContent=profile?.avatarURL?.startsWith('data:')?'🐣':(profile?.avatarURL||'🐣');
+    const avEl = document.getElementById('main-video-av');
+    if (profile?.avatarURL?.startsWith('data:')) {
+      avEl.innerHTML=`<img src="${profile.avatarURL}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.3)">`;
+    } else {
+      avEl.textContent=profile?.avatarURL||'🐣';
+    }
     document.getElementById('main-video-name').textContent=profile?.name||'Bạn';
   }
   document.getElementById('main-video-label').textContent=(profile?.name||'Bạn');
