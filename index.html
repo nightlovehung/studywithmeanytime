@@ -2319,28 +2319,47 @@ function scheduleMidnightReset() {
 scheduleMidnightReset();
 
 // ── pagehide / beforeunload: unified exit cleanup ──
-// Single source of truth: reuses same totalSecs computation as stopClock.
-// Uses setDoc({ merge:true }) — no pre-read — because getDoc is unreliable on pagehide.
+// Firebase SDK calls are cancelled by browser on tab close.
+// Use Firestore REST API with fetch keepalive instead.
+function _firestoreSet(path, data) {
+  // Convert JS object to Firestore REST format
+  function toFSValue(v) {
+    if (v === null || v === undefined) return { nullValue: null };
+    if (typeof v === 'boolean') return { booleanValue: v };
+    if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+    if (typeof v === 'string') return { stringValue: v };
+    return { nullValue: null };
+  }
+  const fields = {};
+  Object.entries(data).forEach(([k,v]) => { fields[k] = toFSValue(v); });
+
+  const project = firebaseConfig.projectId;
+  const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/${path}?updateMask.fieldPaths=${Object.keys(data).join('&updateMask.fieldPaths=')}`;
+  try {
+    fetch(url, {
+      method: 'PATCH', keepalive: true,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields })
+    }).catch(()=>{});
+  } catch(e) {}
+}
+
 function _emergencyCleanup() {
   if (!currentUser || !currentRoomId) return;
 
-  // ── 1. Stop timer & save session (mirrors stopClock logic) ──
+  // ── 1. Stop timer & save session ──
   if (isRunning) {
     isRunning = false;
 
-    // Use local _sessionStartMs — same source of truth as stopClock.
-    // Falls back to remoteClocks only if _sessionStartMs was lost.
     let totalSecs = 0;
     if (_sessionStartMs) {
       const cd = remoteClocks[currentUser.uid] || {};
-      const localElapsed = Math.floor((Date.now() - _sessionStartMs) / 1000);
-      totalSecs = (cd.accumulated || 0) + localElapsed;
+      totalSecs = (cd.accumulated || 0) + Math.floor((Date.now() - _sessionStartMs) / 1000);
     } else {
       const cd = remoteClocks[currentUser.uid] || {};
       if (cd.startedAt) {
         const startMs = typeof cd.startedAt.toMillis === 'function'
-          ? cd.startedAt.toMillis()
-          : Number(cd.startedAt);
+          ? cd.startedAt.toMillis() : Number(cd.startedAt);
         totalSecs = (cd.accumulated || 0) + Math.floor((Date.now() - startMs) / 1000);
       } else {
         totalSecs = cd.accumulated || mySeconds || 0;
@@ -2348,25 +2367,23 @@ function _emergencyCleanup() {
     }
     _sessionStartMs = null;
 
-    // Stop clockStatus on Firestore (fire-and-forget; browser may cancel but worth trying)
-    setDoc(
-      doc(db, 'rooms', currentRoomId, 'clockStatus', currentUser.uid),
-      { running: false, startedAt: null, accumulated: 0 }
-    ).catch(() => {});
+    // Reset clockStatus via keepalive fetch
+    _firestoreSet(
+      `rooms/${currentRoomId}/clockStatus/${currentUser.uid}`,
+      { running: false, accumulated: 0 }
+    );
 
-    // Persist study time if session >= 15 min.
-    // setDoc+merge: no read needed, safe to call on pagehide.
+    // Save study time if >= 15 min
     if (totalSecs >= 900) {
       const toWrite = Math.max(totalSecs, lastAutoSaved);
-      setDoc(
-        doc(db, 'rooms', currentRoomId, 'studyDays', todayKey()),
-        { [currentUser.uid]: toWrite },
-        { merge: true }
-      ).catch(() => {});
+      _firestoreSet(
+        `rooms/${currentRoomId}/studyDays/${todayKey()}`,
+        { [currentUser.uid]: toWrite }
+      );
     }
   }
 
-  // ── 2. End video call & release all media resources (always, unconditionally) ──
+  // ── 2. End video call ──
   if (localStream) {
     localStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
     localStream = null;
@@ -2374,17 +2391,17 @@ function _emergencyCleanup() {
   Object.values(peerConns || {}).forEach(pc => { try { pc.close(); } catch(e) {} });
   peerConns = {};
 
-  deleteDoc(
-    doc(db, 'rooms', currentRoomId, 'callParticipants', currentUser.uid)
-  ).catch(() => {});
-
+  // Remove from callParticipants via keepalive DELETE
   try {
-    const invSnap = remoteClocks['__callInvite__'];
-    if (invSnap?.startedBy === currentUser.uid) {
-      setDoc(doc(db, 'rooms', currentRoomId, 'call', 'invite'),
-        { active: false }, { merge: true }).catch(() => {});
-    }
+    const project = firebaseConfig.projectId;
+    fetch(
+      `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/rooms/${currentRoomId}/callParticipants/${currentUser.uid}`,
+      { method: 'DELETE', keepalive: true }
+    ).catch(()=>{});
   } catch(e) {}
+
+  // Deactivate invite if I started the call
+  _firestoreSet(`rooms/${currentRoomId}/call/invite`, { active: false });
 
   // ── 3. Unsubscribe listeners ──
   if (typeof callPartUnsub === 'function')    { try { callPartUnsub(); }    catch(e) {} callPartUnsub = null; }
@@ -4038,6 +4055,7 @@ function getMonthKeys(year, month) {
 
 /* ── Draw SVG bar chart ── */
 function drawBarChart(container, labels, values, colors, maxVal, streakDays) {
+  if (!container) return; // null guard
   const W = 560, H = 160, PL = 30, PR = 10, PT = 20, PB = 30;
   const chartW = W - PL - PR, chartH = H - PT - PB;
   const n = labels.length;
@@ -4079,7 +4097,6 @@ function drawBarChart(container, labels, values, colors, maxVal, streakDays) {
 
 /* ═══════ WEEKLY CHART ═══════ */
 function renderWeeklyChart(body) {
-  // Guard: must be in a room
   if (!currentRoomId) {
     body.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px;font-weight:700">Vào phòng học để xem thống kê 📚</p>';
     return;
@@ -4120,7 +4137,8 @@ function renderWeeklyChart(body) {
     ${totalSecs === 0 ? '<p style="text-align:center;color:var(--muted);padding:12px;font-size:13px;font-weight:700">Chưa có dữ liệu tuần này — bắt đầu học thôi! 🚀</p>' : ''}`;
 
   const streakDays = keys.map(k => (studyData[k]?.[currentUser?.uid] || 0) >= 900);
-  drawBarChart(document.getElementById('weekly-chart-svg'), labels, values, colors, maxVal, streakDays);
+  // Dùng body.querySelector thay vì getElementById để tránh lấy nhầm element cũ
+  drawBarChart(body.querySelector('#weekly-chart-svg'), labels, values, colors, maxVal, streakDays);
 }
 
 /* ═══════ MONTHLY CHART ═══════ */
@@ -4165,7 +4183,7 @@ function renderMonthlyChart(body) {
     </p>
     ${totalSecs === 0 ? '<p style="text-align:center;color:var(--muted);padding:12px;font-size:13px;font-weight:700">Chưa có dữ liệu tháng này — bắt đầu học thôi! 🚀</p>' : ''}`;
 
-  drawBarChart(document.getElementById('monthly-chart-svg'), labels, values, colors, maxVal, streakDays);
+  drawBarChart(body.querySelector('#monthly-chart-svg'), labels, values, colors, maxVal, streakDays);
 }
 
 /* ═══════ RANKING ═══════ */
