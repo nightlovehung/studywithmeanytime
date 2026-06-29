@@ -1033,6 +1033,184 @@
     }
     .chat-msg:hover .reply-btn { opacity:1; }
     .reply-btn:hover { background:var(--theme-l,#e8f8e0); border-color:var(--theme,#58CC02); }
+
+    /* ══════════════════════════════════════════
+       ANALYTICS PANEL
+    ══════════════════════════════════════════ */
+    #analytics-panel {
+      display:none; position:fixed; inset:0; z-index:150;
+      background:rgba(0,0,0,.45); align-items:center; justify-content:center; padding:16px;
+    }
+    #analytics-panel.open { display:flex; }
+    .analytics-card {
+      background:#fff; border-radius:24px; padding:0;
+      width:100%; max-width:680px; max-height:90vh; overflow:hidden;
+      display:flex; flex-direction:column;
+      box-shadow:0 20px 60px rgba(0,0,0,.2);
+      animation:popIn .25s cubic-bezier(.34,1.56,.64,1);
+    }
+    .analytics-header {
+      padding:20px 24px 16px; border-bottom:2px solid var(--border);
+      display:flex; align-items:center; gap:12px; flex-shrink:0;
+    }
+    .analytics-header h2 { flex:1; font-size:20px; font-weight:900; color:var(--text); }
+    .analytics-close {
+      width:34px; height:34px; border-radius:50%; border:2px solid var(--border);
+      background:#fff; cursor:pointer; font-size:18px; display:flex;
+      align-items:center; justify-content:center; transition:background .15s;
+    }
+    .analytics-close:hover { background:#f0fdf4; }
+    .analytics-tabs {
+      display:flex; gap:0; border-bottom:2px solid var(--border); flex-shrink:0;
+      background:#fafafa;
+    }
+    .analytics-tab {
+      flex:1; padding:12px 8px; border:none; background:none; cursor:pointer;
+      font-family:'Nunito',sans-serif; font-size:13px; font-weight:800;
+      color:var(--muted); transition:color .2s, border-color .2s;
+      border-bottom:3px solid transparent; margin-bottom:-2px;
+    }
+    .analytics-tab.active { color:var(--theme-d,#46a302); border-bottom-color:var(--theme,#58CC02); }
+    .analytics-body { flex:1; overflow-y:auto; padding:20px 24px; }
+
+    /* Chart area */
+    .chart-wrap {
+      position:relative; width:100%; height:220px; margin-bottom:20px;
+    }
+    .chart-svg { width:100%; height:100%; overflow:visible; }
+    .chart-bar { transition:opacity .15s; cursor:pointer; }
+    .chart-bar:hover { opacity:.75; }
+    .chart-label {
+      font-size:10px; font-weight:800; fill:var(--muted,#7F8C8D);
+      text-anchor:middle; font-family:'Nunito',sans-serif;
+    }
+    .chart-value {
+      font-size:10px; font-weight:900; fill:var(--green-d,#46a302);
+      text-anchor:middle; font-family:'Nunito',sans-serif;
+    }
+    .chart-axis { stroke:var(--border,#E8F5E9); stroke-width:1.5; }
+
+    /* Streak highlights on monthly chart */
+    .streak-dot { fill:#FFC800; }
+
+    /* Summary stats row */
+    .stats-row {
+      display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px;
+    }
+    .stat-chip {
+      background:var(--theme-l,#e8f8e0); border:2px solid var(--theme-border,#E8F5E9);
+      border-radius:14px; padding:12px; text-align:center;
+    }
+    .stat-chip-val { font-size:22px; font-weight:900; color:var(--theme-d,#46a302); }
+    .stat-chip-lbl { font-size:10px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
+
+    /* Tab toggle inside analytics */
+    .sub-toggle {
+      display:flex; gap:8px; margin-bottom:16px;
+    }
+    .sub-toggle-btn {
+      padding:6px 14px; border-radius:20px; border:2px solid var(--border);
+      background:#fff; font-family:'Nunito',sans-serif; font-size:12px; font-weight:800;
+      cursor:pointer; color:var(--muted); transition:all .2s;
+    }
+    .sub-toggle-btn.active { background:var(--theme,#58CC02); border-color:var(--theme,#58CC02); color:#fff; }
+
+    /* ── LEADERBOARD ── */
+    .leaderboard { display:flex; flex-direction:column; gap:8px; }
+    .lb-row {
+      display:flex; align-items:center; gap:12px; padding:10px 14px;
+      border-radius:14px; border:2px solid var(--border); background:#fff;
+      transition:background .15s;
+    }
+    .lb-row.rank-1 {
+      border-color:#FFD700;
+      background:linear-gradient(135deg,#fffbe6,#fff7cc);
+      box-shadow:0 0 0 3px rgba(255,215,0,.2), 0 4px 16px rgba(255,215,0,.15);
+      animation:goldGlow 2.5s ease-in-out infinite alternate;
+    }
+    @keyframes goldGlow {
+      from { box-shadow:0 0 0 3px rgba(255,215,0,.2), 0 4px 16px rgba(255,215,0,.15); }
+      to   { box-shadow:0 0 0 6px rgba(255,215,0,.35), 0 4px 24px rgba(255,215,0,.3); }
+    }
+    .lb-rank {
+      font-size:18px; font-weight:900; width:28px; text-align:center; flex-shrink:0;
+    }
+    .lb-av {
+      width:36px; height:36px; border-radius:50%; background:var(--theme-l,#e8f8e0);
+      display:flex; align-items:center; justify-content:center; font-size:20px;
+      flex-shrink:0; overflow:hidden; border:2px solid var(--theme-border,#E8F5E9);
+    }
+    .lb-av img { width:100%; height:100%; object-fit:cover; }
+    .lb-info { flex:1; min-width:0; }
+    .lb-name { font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .lb-sub  { font-size:11px; color:var(--muted); font-weight:700; }
+    .lb-time {
+      font-size:15px; font-weight:900; color:var(--theme-d,#46a302);
+      white-space:nowrap; flex-shrink:0;
+    }
+    .lb-time.is-me { color:var(--blue,#1CB0F6); }
+    /* Live pulse dot */
+    .lb-live {
+      width:8px; height:8px; border-radius:50%; background:#58CC02;
+      animation:pulse-green 1.5s ease-in-out infinite; flex-shrink:0;
+    }
+    @keyframes pulse-green {
+      0%,100% { opacity:1; transform:scale(1); }
+      50% { opacity:.4; transform:scale(1.4); }
+    }
+
+    /* ── ACHIEVEMENTS ── */
+    .achievement-section-title {
+      font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+      color:var(--muted); margin:0 0 10px;
+    }
+    .badges-grid {
+      display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px;
+      margin-bottom:24px;
+    }
+    .badge-card {
+      border-radius:16px; padding:14px 12px; text-align:center;
+      border:2px solid var(--border); background:#fff;
+      transition:transform .15s, box-shadow .15s;
+      position:relative; overflow:hidden;
+    }
+    .badge-card.unlocked {
+      border-color:var(--theme,#58CC02);
+      background:linear-gradient(135deg,var(--theme-l,#e8f8e0),#fff);
+      cursor:default;
+    }
+    .badge-card.unlocked:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(88,204,2,.2); }
+    .badge-card.in-progress {
+      border-color:#FFC800; background:linear-gradient(135deg,#fffbe6,#fff);
+    }
+    .badge-card.locked { opacity:.55; filter:grayscale(.6); }
+    .badge-icon { font-size:32px; display:block; margin-bottom:6px; line-height:1.2; }
+    .badge-name { font-size:12px; font-weight:900; color:var(--text); margin-bottom:4px; }
+    .badge-desc { font-size:10px; font-weight:700; color:var(--muted); line-height:1.4; }
+    .badge-progress-bar {
+      height:4px; background:var(--border); border-radius:4px; margin-top:8px; overflow:hidden;
+    }
+    .badge-progress-fill {
+      height:100%; border-radius:4px;
+      background:linear-gradient(90deg,#FFC800,#FF9800);
+      transition:width .6s cubic-bezier(.34,1.56,.64,1);
+    }
+    .badge-unlocked-stamp {
+      position:absolute; top:6px; right:6px; font-size:14px; line-height:1;
+    }
+    /* Badge unlock animation */
+    .badge-unlock-popup {
+      position:fixed; bottom:80px; left:50%; transform:translateX(-50%) translateY(20px);
+      background:linear-gradient(135deg,#fff8e6,#fffbe0);
+      border:2px solid #FFC800; border-radius:20px; padding:12px 20px;
+      font-size:14px; font-weight:900; color:#7a5900;
+      box-shadow:0 8px 32px rgba(255,200,0,.3); z-index:300;
+      opacity:0; pointer-events:none; white-space:nowrap;
+      transition:opacity .3s, transform .4s cubic-bezier(.34,1.56,.64,1);
+    }
+    .badge-unlock-popup.show {
+      opacity:1; transform:translateX(-50%) translateY(0);
+    }
   </style>
 </head>
 <body>
@@ -1216,6 +1394,7 @@
         <span class="streak-fire">🔥</span><span class="streak-count" id="streak-count-topbar">0</span>
       </span>
       <button class="icon-btn" id="btn-copy-code" title="Sao chép mã phòng">📋</button>
+      <button class="icon-btn" id="btn-analytics" title="Analytics & Ranking">📊</button>
       <!-- manage menu -->
       <div class="manage-menu-wrap">
         <button class="icon-btn room-manage-btn" id="btn-manage-room" title="Quản lý phòng">⚙️</button>
@@ -3675,5 +3854,527 @@ document.addEventListener('click', e => {
   }
 });
 </script>
+<!-- ══ ANALYTICS PANEL ══ -->
+<div id="analytics-panel">
+  <div class="analytics-card">
+    <div class="analytics-header">
+      <span style="font-size:26px">📊</span>
+      <h2>Analytics & Ranking</h2>
+      <button class="analytics-close" id="analytics-close">✕</button>
+    </div>
+    <div class="analytics-tabs">
+      <button class="analytics-tab active" data-atab="weekly">📈 Tuần này</button>
+      <button class="analytics-tab" data-atab="monthly">📅 Tháng này</button>
+      <button class="analytics-tab" data-atab="ranking">🏆 Ranking</button>
+      <button class="analytics-tab" data-atab="achievements">🎖 Thành tích</button>
+    </div>
+    <div class="analytics-body" id="analytics-body">
+      <div class="spinner" style="margin:40px auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Badge unlock popup -->
+<div class="badge-unlock-popup" id="badge-unlock-popup">🏅 <span id="badge-unlock-text">Badge mới!</span></div>
+
+<script>
+/* ══════════════════════════════════════════
+   ANALYTICS + RANKING + ACHIEVEMENT SYSTEM
+══════════════════════════════════════════ */
+
+/* ── Open / close ── */
+document.getElementById('btn-analytics').addEventListener('click', () => {
+  document.getElementById('analytics-panel').classList.add('open');
+  renderAnalyticsTab('weekly');
+});
+document.getElementById('analytics-close').addEventListener('click', () => {
+  document.getElementById('analytics-panel').classList.remove('open');
+});
+document.getElementById('analytics-panel').addEventListener('click', e => {
+  if (e.target === document.getElementById('analytics-panel'))
+    document.getElementById('analytics-panel').classList.remove('open');
+});
+
+/* ── Tab switching ── */
+document.querySelectorAll('.analytics-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.analytics-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderAnalyticsTab(btn.dataset.atab);
+  });
+});
+
+/* ── Tab router ── */
+function renderAnalyticsTab(tab) {
+  const body = document.getElementById('analytics-body');
+  body.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
+  if (tab === 'weekly')       renderWeeklyChart(body);
+  else if (tab === 'monthly') renderMonthlyChart(body);
+  else if (tab === 'ranking') renderRanking(body);
+  else if (tab === 'achievements') renderAchievements(body);
+}
+
+/* ── Helpers ── */
+function secsToHM(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h}g${m > 0 ? m + 'p' : ''}`;
+  return `${m}p`;
+}
+function fmtHours(s) {
+  return (s / 3600).toFixed(1) + 'g';
+}
+function getLast7Keys() {
+  const keys = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    keys.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  }
+  return keys;
+}
+function getDayLabel(key) {
+  const d = new Date(key + 'T00:00:00');
+  return ['CN','T2','T3','T4','T5','T6','T7'][d.getDay()];
+}
+function getMySecsOnDay(key) {
+  if (!currentUser) return 0;
+  return studyData[key]?.[currentUser.uid] || 0;
+}
+function getMonthKeys(year, month) {
+  const days = new Date(year, month + 1, 0).getDate();
+  const keys = [];
+  for (let d = 1; d <= days; d++)
+    keys.push(`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+  return keys;
+}
+
+/* ── Draw SVG bar chart ── */
+function drawBarChart(container, labels, values, colors, maxVal, streakDays) {
+  const W = 560, H = 160, PL = 30, PR = 10, PT = 20, PB = 30;
+  const chartW = W - PL - PR, chartH = H - PT - PB;
+  const n = labels.length;
+  const barW = Math.floor(chartW / n * 0.55);
+  const gap  = chartW / n;
+
+  let svg = `<svg class="chart-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  // Y axis line
+  svg += `<line class="chart-axis" x1="${PL}" y1="${PT}" x2="${PL}" y2="${PT+chartH}"/>`;
+  svg += `<line class="chart-axis" x1="${PL}" y1="${PT+chartH}" x2="${W-PR}" y2="${PT+chartH}"/>`;
+
+  values.forEach((v, i) => {
+    const x = PL + gap * i + gap / 2;
+    const barH = maxVal > 0 ? Math.max(2, (v / maxVal) * chartH) : 2;
+    const y = PT + chartH - barH;
+    const col = colors[i] || '#58CC02';
+
+    // bar
+    svg += `<rect class="chart-bar" x="${x - barW/2}" y="${y}" width="${barW}" height="${barH}" rx="5" fill="${col}" fill-opacity=".88"/>`;
+
+    // streak dot
+    if (streakDays && streakDays[i] && v > 0) {
+      svg += `<circle class="streak-dot" cx="${x}" cy="${y - 7}" r="4"/>`;
+    }
+
+    // value label (only show if bar tall enough)
+    if (v > 0) {
+      const lbl = secsToHM(v);
+      svg += `<text class="chart-value" x="${x}" y="${y - (barH > 18 ? barH + 2 : -14)}" dy="-2">${lbl}</text>`;
+    }
+
+    // x label
+    svg += `<text class="chart-label" x="${x}" y="${PT + chartH + 16}">${labels[i]}</text>`;
+  });
+
+  svg += '</svg>';
+  container.innerHTML = svg;
+}
+
+/* ═══════ WEEKLY CHART ═══════ */
+function renderWeeklyChart(body) {
+  const keys = getLast7Keys();
+  const labels = keys.map(getDayLabel);
+  const values = keys.map(getMySecsOnDay);
+  const today = new Date();
+  const todayKey2 = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  const colors = keys.map(k => k === todayKey2 ? '#1CB0F6' : '#58CC02');
+  const maxVal = Math.max(...values, 900);
+
+  const totalSecs = values.reduce((a,b) => a+b, 0);
+  const studiedDays = values.filter(v => v >= 900).length;
+  const avgSecs = studiedDays > 0 ? Math.round(totalSecs / studiedDays) : 0;
+
+  body.innerHTML = `
+    <div class="stats-row">
+      <div class="stat-chip">
+        <div class="stat-chip-val">${studiedDays}/${keys.length}</div>
+        <div class="stat-chip-lbl">Ngày học</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-val">${fmtHours(totalSecs)}</div>
+        <div class="stat-chip-lbl">Tổng giờ</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-val">${avgSecs > 0 ? secsToHM(avgSecs) : '—'}</div>
+        <div class="stat-chip-lbl">TB/ngày học</div>
+      </div>
+    </div>
+    <div class="chart-wrap" id="weekly-chart-svg"></div>
+    <p style="font-size:11px;color:var(--muted);font-weight:700;text-align:center;margin-top:4px">
+      🔵 = hôm nay &nbsp;•&nbsp; 🟡 = ngày streak đủ 15p
+    </p>`;
+
+  const streakDays = keys.map(k => (studyData[k]?.[currentUser?.uid] || 0) >= 900);
+  drawBarChart(document.getElementById('weekly-chart-svg'), labels, values, colors, maxVal, streakDays);
+}
+
+/* ═══════ MONTHLY CHART ═══════ */
+function renderMonthlyChart(body) {
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const keys = getMonthKeys(year, month);
+  const values = keys.map(getMySecsOnDay);
+  const labels = keys.map(k => String(parseInt(k.slice(8))));
+  const todayKey2 = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const colors = keys.map(k => k === todayKey2 ? '#1CB0F6' : '#58CC02');
+  const streakDays = keys.map(k => (studyData[k]?.[currentUser?.uid] || 0) >= 900);
+  const maxVal = Math.max(...values, 900);
+
+  const totalSecs = values.reduce((a,b) => a+b, 0);
+  const studiedDays = values.filter(v => v >= 900).length;
+
+  // Calc streak
+  const streak = calcStreak();
+
+  body.innerHTML = `
+    <div class="stats-row">
+      <div class="stat-chip">
+        <div class="stat-chip-val">${studiedDays}</div>
+        <div class="stat-chip-lbl">Ngày học tháng này</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-val">${fmtHours(totalSecs)}</div>
+        <div class="stat-chip-lbl">Tổng giờ tháng</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-val">🔥 ${streak}</div>
+        <div class="stat-chip-lbl">Streak hiện tại</div>
+      </div>
+    </div>
+    <div class="chart-wrap" id="monthly-chart-svg"></div>
+    <p style="font-size:11px;color:var(--muted);font-weight:700;text-align:center;margin-top:4px">
+      🟡 = ngày streak &nbsp;•&nbsp; 🔵 = hôm nay
+    </p>`;
+
+  drawBarChart(document.getElementById('monthly-chart-svg'), labels, values, colors, maxVal, streakDays);
+}
+
+/* ═══════ RANKING ═══════ */
+let _rankingMode = 'today'; // 'today' | 'week'
+let _rankingUnsub = null;
+
+function renderRanking(body) {
+  body.innerHTML = `
+    <div class="sub-toggle" id="rank-toggle">
+      <button class="sub-toggle-btn active" data-mode="today">Hôm nay</button>
+      <button class="sub-toggle-btn" data-mode="week">Tuần này</button>
+    </div>
+    <div id="leaderboard-list"><div class="spinner" style="margin:32px auto"></div></div>`;
+
+  body.querySelectorAll('.sub-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      body.querySelectorAll('.sub-toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _rankingMode = btn.dataset.mode;
+      buildLeaderboard();
+    });
+  });
+
+  buildLeaderboard();
+}
+
+function getSecsForUser(uid, mode) {
+  if (mode === 'today') {
+    const today = new Date();
+    const k = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    return studyData[k]?.[uid] || 0;
+  } else {
+    // week
+    let total = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      total += studyData[k]?.[uid] || 0;
+    }
+    return total;
+  }
+}
+
+function buildLeaderboard() {
+  const listEl = document.getElementById('leaderboard-list');
+  if (!listEl) return;
+
+  const entries = Object.entries(roomMembers).map(([uid, profile]) => {
+    // Add live elapsed if running
+    const cd = remoteClocks[uid] || {};
+    let secs = getSecsForUser(uid, _rankingMode);
+    if (cd.running && cd.startedAt) {
+      const elapsed = Math.floor((Date.now() - cd.startedAt.toMillis()) / 1000);
+      if (_rankingMode === 'today') secs = Math.max(secs, (cd.accumulated||0) + elapsed);
+      else secs += elapsed; // week: add live
+    }
+    return { uid, profile, secs, running: cd.running };
+  });
+
+  // Include self if not in roomMembers yet
+  if (!entries.find(e => e.uid === currentUser?.uid)) {
+    const cd = remoteClocks[currentUser?.uid] || {};
+    let secs = getSecsForUser(currentUser?.uid, _rankingMode);
+    if (cd.running && cd.startedAt) {
+      const elapsed = Math.floor((Date.now() - cd.startedAt.toMillis()) / 1000);
+      secs = Math.max(secs, (cd.accumulated||0) + elapsed);
+    }
+    entries.push({ uid: currentUser?.uid, profile: userProfile, secs, running: cd.running });
+  }
+
+  entries.sort((a,b) => b.secs - a.secs);
+
+  const rankEmojis = ['👑','🥈','🥉'];
+  listEl.innerHTML = '';
+
+  if (entries.length === 0) {
+    listEl.innerHTML = '<p style="text-align:center;color:var(--muted);padding:32px">Chưa có dữ liệu 🤔</p>';
+    return;
+  }
+
+  const lb = document.createElement('div'); lb.className = 'leaderboard';
+  entries.forEach(({ uid, profile, secs, running }, idx) => {
+    const isMe = uid === currentUser?.uid;
+    const row = document.createElement('div');
+    row.className = 'lb-row' + (idx === 0 ? ' rank-1' : '');
+
+    const rankStr = idx < 3 ? rankEmojis[idx] : `${idx+1}`;
+    const avSrc = profile?.avatarURL;
+    let avHTML = '';
+    if (avSrc?.startsWith('data:')) {
+      avHTML = `<img src="${avSrc}" alt="">`;
+    } else {
+      avHTML = avSrc || '🐣';
+    }
+
+    row.innerHTML = `
+      <div class="lb-rank">${rankStr}</div>
+      <div class="lb-av">${avSrc?.startsWith('data:') ? `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover">` : (avSrc||'🐣')}</div>
+      <div class="lb-info">
+        <div class="lb-name">${profile?.name || 'Ẩn danh'}${isMe ? ' <span style="font-size:10px;color:var(--blue)">(bạn)</span>' : ''}</div>
+        <div class="lb-sub">${_rankingMode === 'today' ? 'Hôm nay' : '7 ngày qua'}</div>
+      </div>
+      ${running ? '<div class="lb-live" title="Đang học"></div>' : ''}
+      <div class="lb-time${isMe ? ' is-me' : ''}">${secs > 0 ? secsToHM(secs) : '—'}</div>`;
+
+    lb.appendChild(row);
+  });
+  listEl.appendChild(lb);
+
+  // Live update every second if anyone is running
+  const anyRunning = entries.some(e => e.running);
+  if (anyRunning) {
+    setTimeout(() => {
+      if (document.getElementById('leaderboard-list')) buildLeaderboard();
+    }, 5000);
+  }
+}
+
+/* ═══════ ACHIEVEMENTS ═══════ */
+const BADGE_DEFS = [
+  {
+    id: 'streak7',    icon: '🔥', name: '7-Day Warrior',
+    desc: 'Học liên tục 7 ngày không nghỉ',
+    check: (stats) => stats.streak >= 7,
+    progress: (stats) => Math.min(stats.streak / 7, 1),
+  },
+  {
+    id: 'streak30',   icon: '💎', name: 'Monthly Legend',
+    desc: 'Streak 30 ngày liên tiếp',
+    check: (stats) => stats.streak >= 30,
+    progress: (stats) => Math.min(stats.streak / 30, 1),
+  },
+  {
+    id: 'century',    icon: '⏱', name: 'Century Grinder',
+    desc: 'Học tổng cộng 100 giờ trong tháng',
+    check: (stats) => stats.monthlyHours >= 100,
+    progress: (stats) => Math.min(stats.monthlyHours / 100, 1),
+  },
+  {
+    id: 'teamplayer', icon: '👥', name: 'Team Player',
+    desc: 'Tham gia 3+ phòng học khác nhau',
+    check: (stats) => stats.roomCount >= 3,
+    progress: (stats) => Math.min(stats.roomCount / 3, 1),
+  },
+  {
+    id: 'focusbeast', icon: '💪', name: 'Focus Beast',
+    desc: 'Học một phiên liên tục ≥ 2 giờ',
+    check: (stats) => stats.longestSession >= 7200,
+    progress: (stats) => Math.min(stats.longestSession / 7200, 1),
+  },
+  {
+    id: 'earlybird',  icon: '🌅', name: 'Early Bird',
+    desc: 'Bắt đầu học trước 7 giờ sáng',
+    check: (stats) => stats.earlyBird,
+    progress: (stats) => stats.earlyBird ? 1 : 0,
+  },
+  {
+    id: 'first15',    icon: '🌱', name: 'First Step',
+    desc: 'Hoàn thành phiên học đầu tiên 15 phút',
+    check: (stats) => stats.totalDays >= 1,
+    progress: (stats) => Math.min(stats.totalDays, 1),
+  },
+  {
+    id: 'week50h',    icon: '🚀', name: 'Rocket Week',
+    desc: 'Học hơn 50 giờ trong một tuần',
+    check: (stats) => stats.weeklyHours >= 50,
+    progress: (stats) => Math.min(stats.weeklyHours / 50, 1),
+  },
+];
+
+function calcAchievementStats() {
+  if (!currentUser) return {};
+  const uid = currentUser.uid;
+  const streak = calcStreak();
+
+  // Monthly hours
+  const now = new Date();
+  const monthKeys = getMonthKeys(now.getFullYear(), now.getMonth());
+  const monthlyHours = monthKeys.reduce((a, k) => a + (studyData[k]?.[uid] || 0), 0) / 3600;
+
+  // Weekly hours
+  const weekKeys = getLast7Keys();
+  const weeklyHours = weekKeys.reduce((a, k) => a + (studyData[k]?.[uid] || 0), 0) / 3600;
+
+  // Total study days ever
+  const totalDays = Object.keys(studyData).filter(k => (studyData[k]?.[uid] || 0) >= 900).length;
+
+  // Room count from userProfile
+  const roomCount = (userProfile?.rooms || []).length;
+
+  // Longest single session — we approximate from today's data (can't track across sessions without extra Firestore)
+  // Use today's accumulated for now
+  const todayK = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const longestSession = studyData[todayK]?.[uid] || 0;
+
+  // Early bird: check if we have data before 7am - approximate via profile flag
+  const earlyBird = userProfile?.earlyBird || false;
+
+  return { streak, monthlyHours, weeklyHours, totalDays, roomCount, longestSession, earlyBird };
+}
+
+// Track previously unlocked badges in memory to detect new unlocks
+let _prevUnlocked = new Set();
+
+function renderAchievements(body) {
+  const stats = calcAchievementStats();
+  const unlockedIds = BADGE_DEFS.filter(b => b.check(stats)).map(b => b.id);
+
+  // Detect new unlocks
+  unlockedIds.forEach(id => {
+    if (!_prevUnlocked.has(id)) {
+      const badge = BADGE_DEFS.find(b => b.id === id);
+      if (badge && _prevUnlocked.size > 0) { // don't fire on first load
+        showBadgeUnlock(badge);
+      }
+    }
+  });
+  _prevUnlocked = new Set(unlockedIds);
+
+  const unlocked = BADGE_DEFS.filter(b => b.check(stats));
+  const inProg   = BADGE_DEFS.filter(b => !b.check(stats) && b.progress(stats) > 0);
+  const locked   = BADGE_DEFS.filter(b => !b.check(stats) && b.progress(stats) === 0);
+
+  body.innerHTML = `
+    <div class="stats-row">
+      <div class="stat-chip">
+        <div class="stat-chip-val">${unlocked.length}</div>
+        <div class="stat-chip-lbl">Đã mở khoá</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-val">${inProg.length}</div>
+        <div class="stat-chip-lbl">Đang tiến hành</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-chip-val">${BADGE_DEFS.length}</div>
+        <div class="stat-chip-lbl">Tổng badges</div>
+      </div>
+    </div>
+
+    ${unlocked.length > 0 ? `
+    <p class="achievement-section-title">✅ Đã mở khoá</p>
+    <div class="badges-grid" id="badges-unlocked"></div>` : ''}
+
+    ${inProg.length > 0 ? `
+    <p class="achievement-section-title">⏳ Đang tiến hành</p>
+    <div class="badges-grid" id="badges-inprog"></div>` : ''}
+
+    ${locked.length > 0 ? `
+    <p class="achievement-section-title">🔒 Chưa mở khoá</p>
+    <div class="badges-grid" id="badges-locked"></div>` : ''}
+  `;
+
+  function renderBadge(badge, state, stats) {
+    const prog = badge.progress(stats);
+    const pct = Math.round(prog * 100);
+    return `
+      <div class="badge-card ${state}">
+        ${state === 'unlocked' ? '<div class="badge-unlocked-stamp">✅</div>' : ''}
+        <span class="badge-icon">${state === 'locked' ? '🔒' : badge.icon}</span>
+        <div class="badge-name">${badge.name}</div>
+        <div class="badge-desc">${badge.desc}</div>
+        ${state !== 'unlocked' ? `
+          <div class="badge-progress-bar">
+            <div class="badge-progress-fill" style="width:${pct}%"></div>
+          </div>
+          <div style="font-size:10px;font-weight:800;color:var(--muted);margin-top:4px">${pct}%</div>
+        ` : ''}
+      </div>`;
+  }
+
+  const ulEl = document.getElementById('badges-unlocked');
+  if (ulEl) ulEl.innerHTML = unlocked.map(b => renderBadge(b, 'unlocked', stats)).join('');
+  const ipEl = document.getElementById('badges-inprog');
+  if (ipEl) ipEl.innerHTML = inProg.map(b => renderBadge(b, 'in-progress', stats)).join('');
+  const lkEl = document.getElementById('badges-locked');
+  if (lkEl) lkEl.innerHTML = locked.map(b => renderBadge(b, 'locked', stats)).join('');
+}
+
+function showBadgeUnlock(badge) {
+  const popup = document.getElementById('badge-unlock-popup');
+  document.getElementById('badge-unlock-text').textContent = `${badge.icon} ${badge.name} mở khoá!`;
+  popup.classList.add('show');
+  setTimeout(() => popup.classList.remove('show'), 3500);
+}
+
+/* ── Auto-check achievements when study data updates ── */
+function checkAchievementsPassive() {
+  if (!currentUser || !userProfile) return;
+  const stats = calcAchievementStats();
+  const unlockedIds = BADGE_DEFS.filter(b => b.check(stats)).map(b => b.id);
+  unlockedIds.forEach(id => {
+    if (!_prevUnlocked.has(id) && _prevUnlocked.size > 0) {
+      const badge = BADGE_DEFS.find(b => b.id === id);
+      if (badge) showBadgeUnlock(badge);
+    }
+  });
+  _prevUnlocked = new Set(unlockedIds);
+}
+
+// Periodically check achievements while in a room
+setInterval(() => {
+  if (currentRoomId && currentUser) checkAchievementsPassive();
+}, 30000);
+
+// Also check shortly after a study celebration fires
+document.getElementById('celebration-overlay').addEventListener('transitionend', () => {
+  setTimeout(checkAchievementsPassive, 800);
+}, { passive: true });
+</script>
+
 </body>
 </html>
