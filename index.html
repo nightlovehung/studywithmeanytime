@@ -199,16 +199,11 @@
       padding:24px; background:linear-gradient(160deg,var(--theme-bg,#e8f8e0) 0%,var(--theme-l,#d4f0ff) 100%);
       position:relative; overflow:hidden;
     }
-    /* Particle canvas sits behind everything */
-    #bg-canvas {
-      position:absolute; inset:0; pointer-events:none; z-index:0;
-    }
     .home-card {
       background:rgba(255,255,255,.88); backdrop-filter:blur(12px);
       -webkit-backdrop-filter:blur(12px);
       border-radius:24px; padding:36px 28px;
       width:100%; max-width:420px; box-shadow:0 8px 40px rgba(0,0,0,.10);
-      position:relative; z-index:1;
       border:1.5px solid rgba(255,255,255,.7);
     }
     .home-header { display:flex; align-items:center; gap:12px; }
@@ -958,24 +953,6 @@
     .theme-picker-label { font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
     .theme-swatches { display:flex; gap:8px; flex-wrap:wrap; }
 
-    /* BG effect pills */
-    .bg-effect-pill {
-      display:flex; align-items:center; gap:5px;
-      padding:6px 12px; border-radius:20px; font-size:12px; font-weight:800;
-      border:2px solid var(--border); background:#fff; cursor:pointer;
-      transition:all .15s; color:var(--text);
-    }
-    .bg-effect-pill:hover { border-color:var(--theme); background:var(--theme-l); }
-    .bg-effect-pill.active { border-color:var(--theme); background:var(--theme-l); color:var(--theme-d); }
-
-    /* Sliders */
-    .bg-sliders { display:flex; flex-direction:column; gap:10px; }
-    .bg-slider-row { display:flex; align-items:center; gap:10px; }
-    .bg-slider-row label { font-size:12px; font-weight:800; color:var(--muted); min-width:120px; display:flex; gap:4px; }
-    .bg-slider-row label span { color:var(--theme-d); min-width:16px; }
-    .bg-slider-row input[type=range] {
-      flex:1; accent-color:var(--theme); height:4px; cursor:pointer;
-    }
     .theme-swatch {
       width:28px; height:28px; border-radius:50%; cursor:pointer;
       border:3px solid transparent; transition:transform .15s, border-color .15s;
@@ -1133,8 +1110,6 @@
 
 <!-- ══ HOME ══ -->
 <div id="screen-home" class="screen">
-  <canvas id="bg-canvas"></canvas>
-
   <div class="home-card">
     <!-- Header: avatar + info + gear button -->
     <div class="home-card-header">
@@ -1346,37 +1321,14 @@
 
 <!-- theme modal -->
 <div class="modal-overlay" id="modal-theme">
-  <div class="modal" style="max-width:440px">
+  <div class="modal" style="max-width:380px">
     <h3>🎨 Tùy chỉnh giao diện</h3>
-    <p>Màu sắc và hiệu ứng nền cho riêng bạn</p>
-
-    <!-- Color swatches -->
+    <p>Chọn màu chủ đạo cho riêng bạn</p>
     <div class="theme-picker-wrap" style="padding:0;margin-bottom:20px">
       <div class="theme-picker-label" style="margin-bottom:10px">Màu chủ đạo</div>
       <div class="theme-swatches" id="theme-swatches"></div>
     </div>
-
-    <!-- Background effect picker -->
-    <div class="theme-picker-label" style="margin-bottom:10px">Hiệu ứng nền 🌸</div>
-    <div id="bg-effect-swatches" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
-
-    <!-- Sliders -->
-    <div class="bg-sliders">
-      <div class="bg-slider-row">
-        <label>Mật độ <span id="lbl-density">35</span></label>
-        <input type="range" id="sl-density" min="10" max="80" value="35" />
-      </div>
-      <div class="bg-slider-row">
-        <label>Tốc độ <span id="lbl-speed">4</span></label>
-        <input type="range" id="sl-speed" min="1" max="10" value="4" />
-      </div>
-      <div class="bg-slider-row">
-        <label>Độ trong suốt <span id="lbl-opacity">7</span></label>
-        <input type="range" id="sl-opacity" min="1" max="10" value="7" />
-      </div>
-    </div>
-
-    <div class="modal-actions" style="margin-top:20px">
+    <div class="modal-actions" style="margin-top:4px">
       <button class="btn btn-ghost" id="btn-cancel-theme">Đóng</button>
     </div>
   </div>
@@ -1519,282 +1471,10 @@ let micOn = true, camOn = true;
 let facingMode = 'user';
 
 /* ── HELPERS ── */
-/* ══════════════════════════════════════════
-   BACKGROUND EFFECTS — configurable particle system
-   bgSettings: effect | count | speed | opacity
-══════════════════════════════════════════ */
-const BG_EFFECTS_DEF = {
-  sakura: {
-    label:'Sakura 🌸', count:38, speed:4, opacity:7,
-    colors:['#ffb7c5','#ffd6e0','#fff0f3','#ffccd5','#f8a5b8','rgba(255,183,197,.45)'],
-    minSize:5, maxSize:13, drift:.55, wobble:true, shape:'petal',
-  },
-  leaves: {
-    label:'Leaves 🍃', count:30, speed:3, opacity:6,
-    colors:['#a8e6a3','#6bcf7f','#4caf50','#81c784','#c8e6c9','#b2dfdb'],
-    minSize:6, maxSize:16, drift:.45, wobble:true, shape:'leaf',
-  },
-  snow: {
-    label:'Snow ❄️', count:50, speed:3, opacity:8,
-    colors:['rgba(220,240,255,.9)','rgba(200,225,255,.7)','#fff','rgba(255,255,255,.6)'],
-    minSize:3, maxSize:9, drift:.2, wobble:true, shape:'circle',
-  },
-  stars: {
-    label:'Stars ✨', count:32, speed:2, opacity:7,
-    colors:['rgba(255,255,255,.9)','rgba(255,220,100,.85)','rgba(200,220,255,.8)','rgba(255,180,100,.7)'],
-    minSize:2, maxSize:7, drift:.1, wobble:true, shape:'star',
-  },
-  bubbles: {
-    label:'Bubble 🫧', count:28, speed:2, opacity:5,
-    colors:['rgba(150,210,255,.35)','rgba(180,230,255,.3)','rgba(200,240,255,.25)'],
-    minSize:8, maxSize:28, drift:.15, wobble:true, shape:'bubble',
-  },
-};
-
-// Runtime settings (merged from saved prefs)
-let bgSettings = { effect:'sakura', count:38, speed:4, opacity:7 };
-
-const BackgroundEffects = {
-  particles:[], canvas:null, ctx:null, raf:null, running:false,
-
-  init(canvasEl) {
-    this.canvas = canvasEl;
-    this.ctx    = canvasEl.getContext('2d');
-    this.resize();
-    window.addEventListener('resize', () => this.resize());
-    this.restart();
-  },
-
-  restart() {
-    if (this.raf) { cancelAnimationFrame(this.raf); this.raf = null; }
-    this.particles = [];
-    const cfg = this._cfg();
-    for (let i = 0; i < cfg.count; i++) this.particles.push(this._make(cfg, true));
-    this.running = true;
-    this._loop(cfg);
-  },
-
-  stop() {
-    this.running = false;
-    if (this.raf) { cancelAnimationFrame(this.raf); this.raf = null; }
-    if (this.ctx && this.canvas) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-  },
-
-  resize() {
-    if (!this.canvas) return;
-    this.canvas.width  = this.canvas.offsetWidth  || window.innerWidth;
-    this.canvas.height = this.canvas.offsetHeight || window.innerHeight;
-  },
-
-  _cfg() {
-    const def = BG_EFFECTS_DEF[bgSettings.effect] || BG_EFFECTS_DEF.sakura;
-    // Override count/speed/opacity from user sliders
-    return {
-      ...def,
-      count:   bgSettings.count,
-      speed:   (bgSettings.speed / 10) * 1.8,   // normalize 1-10 → ~0.18-1.8
-      opacity: bgSettings.opacity / 10,           // normalize 1-10 → 0.1-1.0
-    };
-  },
-
-  _make(cfg, scatter) {
-    const size  = cfg.minSize + Math.random() * (cfg.maxSize - cfg.minSize);
-    const color = cfg.colors[Math.floor(Math.random() * cfg.colors.length)];
-    const W = this.canvas.width, H = this.canvas.height;
-    return {
-      x:     scatter ? Math.random() * W : W + size,
-      y:     scatter ? Math.random() * H : -size,
-      size, color,
-      speed: cfg.speed * (.6 + Math.random() * .8),
-      drift: cfg.drift * (.7 + Math.random() * .6),
-      angle: Math.random() * Math.PI * 2,
-      spin:  (Math.random() - .5) * .025,
-      wobbleAmp:  cfg.wobble ? (.3 + Math.random() * .6) : 0,
-      wobbleFreq: .012 + Math.random() * .012,
-      wobbleOff:  Math.random() * Math.PI * 2,
-      scalePhase: Math.random() * Math.PI * 2,
-      t: Math.floor(Math.random() * 300),
-    };
-  },
-
-  _loop(cfg) {
-    if (!this.running) return;
-    const { ctx, canvas } = this;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const W = canvas.width, H = canvas.height;
-
-    this.particles.forEach(p => {
-      p.t++;
-      p.y += p.speed;
-      p.x -= p.drift + Math.sin(p.t * p.wobbleFreq + p.wobbleOff) * p.wobbleAmp;
-      p.angle += p.spin;
-
-      if (p.y > H + 30 || p.x < -50) {
-        Object.assign(p, this._make(cfg, false));
-        return;
-      }
-
-      // Gentle breathing scale
-      const scalePulse = 1 + .06 * Math.sin(p.t * .018 + p.scalePhase);
-      // Opacity fade in/out
-      const fadeAlpha  = cfg.opacity * (.55 + .35 * Math.sin(p.t * .022 + p.wobbleOff));
-
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.angle);
-      ctx.scale(scalePulse, scalePulse);
-      ctx.globalAlpha = Math.max(0.05, Math.min(1, fadeAlpha));
-
-      switch(bgSettings.effect) {
-        case 'sakura':  this._drawPetal(ctx, p);  break;
-        case 'leaves':  this._drawLeaf(ctx, p);   break;
-        case 'snow':    this._drawCircle(ctx, p);  break;
-        case 'stars':   this._drawStar(ctx, p);    break;
-        case 'bubbles': this._drawBubble(ctx, p);  break;
-        default:        this._drawPetal(ctx, p);
-      }
-      ctx.restore();
-    });
-
-    this.raf = requestAnimationFrame(() => this._loop(cfg));
-  },
-
-  _drawPetal(ctx, p) {
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.moveTo(0, -p.size);
-    ctx.bezierCurveTo( p.size*.8, -p.size*.5,  p.size*.8,  p.size*.5, 0,  p.size);
-    ctx.bezierCurveTo(-p.size*.8,  p.size*.5, -p.size*.8, -p.size*.5, 0, -p.size);
-    ctx.fill();
-  },
-
-  _drawLeaf(ctx, p) {
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.moveTo(0, -p.size);
-    ctx.bezierCurveTo( p.size*.6, -p.size*.3,  p.size*.6,  p.size*.3, 0,  p.size);
-    ctx.bezierCurveTo(-p.size*.6,  p.size*.3, -p.size*.6, -p.size*.3, 0, -p.size);
-    ctx.fill();
-    // vein
-    ctx.strokeStyle = 'rgba(255,255,255,.35)';
-    ctx.lineWidth = .8;
-    ctx.beginPath(); ctx.moveTo(0,-p.size); ctx.lineTo(0,p.size); ctx.stroke();
-  },
-
-  _drawCircle(ctx, p) {
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(0, 0, p.size, 0, Math.PI*2);
-    ctx.fill();
-  },
-
-  _drawStar(ctx, p) {
-    ctx.fillStyle = p.color;
-    const pts = 4, s = p.size;
-    ctx.beginPath();
-    for (let i = 0; i < pts*2; i++) {
-      const r = i%2===0 ? s : s*.35;
-      const a = (i * Math.PI) / pts;
-      i===0 ? ctx.moveTo(r*Math.sin(a),-r*Math.cos(a))
-            : ctx.lineTo(r*Math.sin(a),-r*Math.cos(a));
-    }
-    ctx.closePath(); ctx.fill();
-  },
-
-  _drawBubble(ctx, p) {
-    const r = p.size;
-    const grad = ctx.createRadialGradient(-r*.3,-r*.3,r*.1, 0,0,r);
-    grad.addColorStop(0,'rgba(255,255,255,.5)');
-    grad.addColorStop(.6, p.color);
-    grad.addColorStop(1,'rgba(150,200,255,.08)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=.8;
-    ctx.stroke();
-  },
-};
-
-function startBgParticles() {
-  const canvas = document.getElementById('bg-canvas');
-  if (!canvas) return;
-  BackgroundEffects.stop();
-  BackgroundEffects.init(canvas);
-}
-function stopBgParticles() { BackgroundEffects.stop(); }
-
-/* Build BG effect pills in settings modal */
-function buildBgEffectPills() {
-  const wrap = document.getElementById('bg-effect-swatches');
-  if (!wrap) return;
-  wrap.innerHTML = '';
-  Object.entries(BG_EFFECTS_DEF).forEach(([key, def]) => {
-    const pill = document.createElement('button');
-    pill.className = 'bg-effect-pill' + (bgSettings.effect === key ? ' active' : '');
-    pill.textContent = def.label;
-    pill.dataset.effect = key;
-    pill.addEventListener('click', () => {
-      bgSettings.effect = key;
-      wrap.querySelectorAll('.bg-effect-pill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      saveBgSettings();
-      if (BackgroundEffects.running) BackgroundEffects.restart();
-    });
-    wrap.appendChild(pill);
-  });
-
-  // Sync sliders to current settings
-  ['density','speed','opacity'].forEach(k => {
-    const slKey = k === 'density' ? 'count' : k;
-    const sliderVal = k === 'density'
-      ? Math.round((bgSettings.count / 80) * 100)
-      : bgSettings[k];
-    const el = document.getElementById('sl-' + k);
-    const lbl = document.getElementById('lbl-' + k);
-    if (el) { el.value = sliderVal; if(lbl) lbl.textContent = sliderVal; }
-  });
-}
-
-function saveBgSettings() {
-  if (!currentUser) return;
-  try {
-    localStorage.setItem('bgSettings_' + currentUser.uid, JSON.stringify(bgSettings));
-  } catch(e) {}
-  // Also save to Firestore
-  updateDoc(doc(db,'users',currentUser.uid), { bgSettings }).catch(()=>{});
-  if (BackgroundEffects.canvas) BackgroundEffects.restart();
-}
-
-function loadBgSettings() {
-  if (!currentUser) return;
-  try {
-    const raw = localStorage.getItem('bgSettings_' + currentUser.uid);
-    if (raw) Object.assign(bgSettings, JSON.parse(raw));
-  } catch(e) {}
-  // Also try from userProfile (Firestore)
-  if (userProfile?.bgSettings) Object.assign(bgSettings, userProfile.bgSettings);
-}
-
-// Slider events
-['density','speed','opacity'].forEach(k => {
-  const el = document.getElementById('sl-' + k);
-  const lbl = document.getElementById('lbl-' + k);
-  if (!el) return;
-  el.addEventListener('input', () => {
-    const v = Number(el.value);
-    if (lbl) lbl.textContent = v;
-    if (k === 'density') bgSettings.count = Math.round((v/100)*80);
-    else bgSettings[k] = v;
-    saveBgSettings();
-  });
-});
-
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.getElementById('screen-loading').style.display = 'none';
-  // Start/stop background particles on home screen only
-  if (id === 'screen-home') setTimeout(startBgParticles, 50);
-  else stopBgParticles();
 }
 
 // Countdown hiển thị trên loading screen
@@ -1896,7 +1576,6 @@ onAuthStateChanged(auth, async (user) => {
     userProfile = snap.data();
     // Apply saved theme
     if (typeof userProfile.themeIdx === 'number') applyTheme(userProfile.themeIdx);
-    loadBgSettings();
     renderHome(); showScreen('screen-home');
   } else {
     const googleName = user.displayName || '';
@@ -2707,7 +2386,6 @@ document.getElementById('hs-edit-avatar').addEventListener('click', () => {
 document.getElementById('hs-theme').addEventListener('click', () => {
   _homeGearPanel.classList.remove('open'); _homeGearBtn.classList.remove('open');
   buildThemeSwatches();
-  buildBgEffectPills();
   openModal('modal-theme');
 });
 document.getElementById('hs-logout').addEventListener('click', () => {
