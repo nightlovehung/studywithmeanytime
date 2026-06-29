@@ -2192,6 +2192,9 @@ function renderClocks() {
   });
 }
 
+// Track session start time locally so stopClock never depends on async remoteClocks
+let _sessionStartMs = null;  // set in startClock, cleared in stopClock
+
 function toggleClock() {
   if (isRunning) stopClock(true);
   else { _celebratedThisSession = false; startClock(); }
@@ -2199,6 +2202,7 @@ function toggleClock() {
 
 async function startClock() {
   isRunning = true;
+  _sessionStartMs = Date.now();   // record locally — don't rely on serverTimestamp roundtrip
   const myAccum = remoteClocks[currentUser.uid]?.accumulated || 0;
   await setDoc(doc(db,'rooms',currentRoomId,'clockStatus',currentUser.uid),{
     running: true,
@@ -2209,16 +2213,38 @@ async function startClock() {
 
 async function stopClock(save) {
   if (!isRunning && !save) return;
+
+  // ── Step 1: Snapshot all state BEFORE changing anything ──
+  const wasRunning = isRunning;
+
+  // Compute totalSecs. Prefer the local _sessionStartMs (always accurate) over
+  // remoteClocks which may not have been updated yet by the Firestore listener.
+  let totalSecs = 0;
+  if (wasRunning) {
+    const cd = remoteClocks[currentUser.uid] || {};
+
+    // Use local start time first (most reliable)
+    if (_sessionStartMs) {
+      const localElapsed = Math.floor((Date.now() - _sessionStartMs) / 1000);
+      const accumulated  = cd.accumulated || 0;
+      totalSecs = accumulated + localElapsed;
+    } else if (cd.startedAt) {
+      // Fallback: use Firestore Timestamp if available
+      const startMs = typeof cd.startedAt.toMillis === 'function'
+        ? cd.startedAt.toMillis()
+        : Number(cd.startedAt);
+      totalSecs = (cd.accumulated || 0) + Math.floor((Date.now() - startMs) / 1000);
+    } else {
+      totalSecs = cd.accumulated || mySeconds || 0;
+    }
+  }
+
+  // ── Step 2: Mark stopped locally ──
   isRunning = false;
-  if (clockInterval) { clearInterval(clockInterval); clockInterval=null; }
+  _sessionStartMs = null;
+  if (clockInterval) { clearInterval(clockInterval); clockInterval = null; }
 
-  // Tính tổng từ remote state
-  const cd = remoteClocks[currentUser.uid] || {};
-  const elapsed = cd.running && cd.startedAt
-    ? Math.floor((Date.now() - cd.startedAt.toMillis()) / 1000) : mySeconds;
-  const totalSecs = (cd.accumulated||0) + elapsed;
-
-  // Reset trên Firestore → card biến mất khỏi màn hình mọi người
+  // ── Step 3: Reset Firestore clockStatus (removes card from others' screens) ──
   if (currentUser && currentRoomId) {
     await setDoc(doc(db,'rooms',currentRoomId,'clockStatus',currentUser.uid),{
       running: false, startedAt: null, accumulated: 0
@@ -2226,11 +2252,12 @@ async function stopClock(save) {
     remoteClocks[currentUser.uid] = { running:false, startedAt:null, accumulated:0 };
   }
 
+  // Reset clock display to 0
   const te = document.getElementById('clocktime-'+currentUser?.uid);
   if (te) te.textContent = fmtTime(0);
 
+  // ── Step 4: Persist session and notify ──
   if (save && currentUser && currentRoomId && totalSecs >= 900) {
-    // Truyền tổng tuyệt đối — addStudySeconds dùng MAX, không cộng 2 lần dù đã auto-save
     await addStudySeconds(totalSecs);
     notify('Đã lưu ' + fmtTime(totalSecs) + ' vào lịch hôm nay! 📅', 'success', '🗓️');
     toast('Đã lưu ' + fmtTime(totalSecs) + ' vào lịch! 📅');
@@ -2238,6 +2265,7 @@ async function stopClock(save) {
     notify('Cần học ít nhất 15 phút để điểm danh 😊', 'info', '⏱️');
     toast('Cần học ít nhất 15 phút để điểm danh 😊');
   }
+
   mySeconds = 0; lastAutoSaved = 0;
 }
 
@@ -2258,12 +2286,20 @@ async function addStudySeconds(secs) {
 let lastAutoSaved = 0;
 setInterval(async ()=>{
   if (!isRunning || !currentRoomId) return;
-  const cd = remoteClocks[currentUser.uid]||{};
-  const elapsed = cd.startedAt ? Math.floor((Date.now()-cd.startedAt.toMillis())/1000) : 0;
-  const total = (cd.accumulated||0)+elapsed;
-  if (total >= 900 && total > lastAutoSaved+60) {
+  // Use local _sessionStartMs for accuracy — same source of truth as stopClock
+  const cd = remoteClocks[currentUser.uid] || {};
+  let total = 0;
+  if (_sessionStartMs) {
+    total = (cd.accumulated || 0) + Math.floor((Date.now() - _sessionStartMs) / 1000);
+  } else if (cd.startedAt) {
+    try {
+      const startMs = typeof cd.startedAt.toMillis === 'function'
+        ? cd.startedAt.toMillis() : Number(cd.startedAt);
+      total = (cd.accumulated || 0) + Math.floor((Date.now() - startMs) / 1000);
+    } catch(e) { return; }
+  }
+  if (total >= 900 && total > lastAutoSaved + 60) {
     const isFirst = lastAutoSaved === 0;
-    // Ghi tổng tuyệt đối — addStudySeconds dùng MAX nên không bị cộng 2 lần
     await addStudySeconds(total);
     if (isFirst) notify('Đã học đủ 15 phút — lịch hôm nay tô xanh rồi! 🎉', 'success', '📅');
     lastAutoSaved = total;
@@ -2282,86 +2318,81 @@ function scheduleMidnightReset() {
 }
 scheduleMidnightReset();
 
-// ── pagehide / beforeunload: stop timer, save session, cleanup call ──
-// Uses a synchronous-compatible approach: write with setDoc (no pre-read)
-// because getDoc inside pagehide can be cancelled by the browser.
+// ── pagehide / beforeunload: unified exit cleanup ──
+// Single source of truth: reuses same totalSecs computation as stopClock.
+// Uses setDoc({ merge:true }) — no pre-read — because getDoc is unreliable on pagehide.
 function _emergencyCleanup() {
   if (!currentUser || !currentRoomId) return;
 
-  // ── 1. Stop timer & save session ──
+  // ── 1. Stop timer & save session (mirrors stopClock logic) ──
   if (isRunning) {
     isRunning = false;
-    const cd = remoteClocks[currentUser.uid] || {};
 
-    // Compute elapsed. startedAt from Firestore may be a Timestamp object or a plain number.
-    let startMs = null;
-    if (cd.startedAt) {
-      startMs = typeof cd.startedAt.toMillis === 'function'
-        ? cd.startedAt.toMillis()
-        : Number(cd.startedAt);
+    // Use local _sessionStartMs — same source of truth as stopClock.
+    // Falls back to remoteClocks only if _sessionStartMs was lost.
+    let totalSecs = 0;
+    if (_sessionStartMs) {
+      const cd = remoteClocks[currentUser.uid] || {};
+      const localElapsed = Math.floor((Date.now() - _sessionStartMs) / 1000);
+      totalSecs = (cd.accumulated || 0) + localElapsed;
+    } else {
+      const cd = remoteClocks[currentUser.uid] || {};
+      if (cd.startedAt) {
+        const startMs = typeof cd.startedAt.toMillis === 'function'
+          ? cd.startedAt.toMillis()
+          : Number(cd.startedAt);
+        totalSecs = (cd.accumulated || 0) + Math.floor((Date.now() - startMs) / 1000);
+      } else {
+        totalSecs = cd.accumulated || mySeconds || 0;
+      }
     }
-    const elapsed = startMs ? Math.floor((Date.now() - startMs) / 1000) : mySeconds;
-    const totalSecs = (cd.accumulated || 0) + elapsed;
+    _sessionStartMs = null;
 
-    // Reset clockStatus — fire and forget (best-effort on pagehide)
+    // Stop clockStatus on Firestore (fire-and-forget; browser may cancel but worth trying)
     setDoc(
       doc(db, 'rooms', currentRoomId, 'clockStatus', currentUser.uid),
       { running: false, startedAt: null, accumulated: 0 }
     ).catch(() => {});
 
-    // Save study time if >= 15 min.
-    // Use setDoc with merge + field override instead of read-then-write,
-    // so we don't need a getDoc round-trip that browsers may cancel.
+    // Persist study time if session >= 15 min.
+    // setDoc+merge: no read needed, safe to call on pagehide.
     if (totalSecs >= 900) {
-      const tk = todayKey();
-      // We write the session seconds. If a larger value was already saved
-      // by the auto-save interval (lastAutoSaved), use that instead.
       const toWrite = Math.max(totalSecs, lastAutoSaved);
       setDoc(
-        doc(db, 'rooms', currentRoomId, 'studyDays', tk),
+        doc(db, 'rooms', currentRoomId, 'studyDays', todayKey()),
         { [currentUser.uid]: toWrite },
-        { merge: true }   // merge so other users' fields are preserved
+        { merge: true }
       ).catch(() => {});
     }
   }
 
-  // ── 2. End video call & release all media resources ──
-  // Always clean up, regardless of whether screen-call is active,
-  // because localStream may exist even when the call UI is hidden.
+  // ── 2. End video call & release all media resources (always, unconditionally) ──
   if (localStream) {
     localStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
     localStream = null;
   }
-
-  // Close all WebRTC peer connections
   Object.values(peerConns || {}).forEach(pc => { try { pc.close(); } catch(e) {} });
   peerConns = {};
 
-  // Remove self from callParticipants
   deleteDoc(
     doc(db, 'rooms', currentRoomId, 'callParticipants', currentUser.uid)
   ).catch(() => {});
 
-  // If self is the call initiator, deactivate the invite so others don't see a ghost call
   try {
     const invSnap = remoteClocks['__callInvite__'];
     if (invSnap?.startedBy === currentUser.uid) {
-      setDoc(
-        doc(db, 'rooms', currentRoomId, 'call', 'invite'),
-        { active: false },
-        { merge: true }
-      ).catch(() => {});
+      setDoc(doc(db, 'rooms', currentRoomId, 'call', 'invite'),
+        { active: false }, { merge: true }).catch(() => {});
     }
   } catch(e) {}
 
-  // Unsubscribe all listeners to prevent memory leaks
-  if (typeof callPartUnsub === 'function') { try { callPartUnsub(); } catch(e) {} callPartUnsub = null; }
+  // ── 3. Unsubscribe listeners ──
+  if (typeof callPartUnsub === 'function')    { try { callPartUnsub(); }    catch(e) {} callPartUnsub = null; }
   if (typeof clockStatusUnsub === 'function') { try { clockStatusUnsub(); } catch(e) {} clockStatusUnsub = null; }
   if (remoteClockTick) { clearInterval(remoteClockTick); remoteClockTick = null; }
 }
 
-window.addEventListener('pagehide', _emergencyCleanup);
-// beforeunload fires more reliably on desktop browsers (Chrome, Firefox)
+window.addEventListener('pagehide',     _emergencyCleanup);
 window.addEventListener('beforeunload', _emergencyCleanup);
 
 /* ══════════════════════════════════════════
@@ -3845,11 +3876,17 @@ function triggerStudyCelebration(totalSecs) {
 // Poll every 5s: detect first time crossing 15-min threshold this session
 setInterval(() => {
   if (!isRunning || !currentRoomId || !currentUser || _celebratedThisSession) return;
+  let total = 0;
   const cd = remoteClocks[currentUser.uid] || {};
-  if (!cd.startedAt) return;
-  const startMs = cd.startedAt?.toMillis ? cd.startedAt.toMillis() : Number(cd.startedAt);
-  const elapsed = Math.floor((Date.now() - startMs) / 1000);
-  const total   = (cd.accumulated || 0) + elapsed;
+  if (_sessionStartMs) {
+    total = (cd.accumulated || 0) + Math.floor((Date.now() - _sessionStartMs) / 1000);
+  } else if (cd.startedAt) {
+    try {
+      const startMs = typeof cd.startedAt.toMillis === 'function'
+        ? cd.startedAt.toMillis() : Number(cd.startedAt);
+      total = (cd.accumulated || 0) + Math.floor((Date.now() - startMs) / 1000);
+    } catch(e) { return; }
+  }
   if (total >= 900) {
     _celebratedThisSession = true;
     triggerStudyCelebration(total);
@@ -4180,27 +4217,37 @@ function buildLeaderboard() {
   const listEl = document.getElementById('leaderboard-list');
   if (!listEl) return;
 
+  // Helper: safely get elapsed ms from a Firestore Timestamp or number
+  function safeElapsed(startedAt) {
+    if (!startedAt) return 0;
+    try {
+      const ms = typeof startedAt.toMillis === 'function'
+        ? startedAt.toMillis()
+        : Number(startedAt);
+      return isNaN(ms) ? 0 : Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    } catch(e) { return 0; }
+  }
+
   const entries = Object.entries(roomMembers).map(([uid, profile]) => {
-    // Add live elapsed if running
     const cd = remoteClocks[uid] || {};
     let secs = getSecsForUser(uid, _rankingMode);
-    if (cd.running && cd.startedAt) {
-      const elapsed = Math.floor((Date.now() - cd.startedAt.toMillis()) / 1000);
+    if (cd.running) {
+      const elapsed = safeElapsed(cd.startedAt);
       if (_rankingMode === 'today') secs = Math.max(secs, (cd.accumulated||0) + elapsed);
-      else secs += elapsed; // week: add live
+      else secs += elapsed;
     }
-    return { uid, profile, secs, running: cd.running };
+    return { uid, profile, secs, running: !!cd.running };
   });
 
-  // Include self if not in roomMembers yet
+  // Always include self
   if (!entries.find(e => e.uid === currentUser?.uid)) {
     const cd = remoteClocks[currentUser?.uid] || {};
     let secs = getSecsForUser(currentUser?.uid, _rankingMode);
-    if (cd.running && cd.startedAt) {
-      const elapsed = Math.floor((Date.now() - cd.startedAt.toMillis()) / 1000);
+    if (cd.running) {
+      const elapsed = safeElapsed(cd.startedAt);
       secs = Math.max(secs, (cd.accumulated||0) + elapsed);
     }
-    entries.push({ uid: currentUser?.uid, profile: userProfile, secs, running: cd.running });
+    entries.push({ uid: currentUser?.uid, profile: userProfile, secs, running: !!cd.running });
   }
 
   entries.sort((a,b) => b.secs - a.secs);
@@ -4216,21 +4263,18 @@ function buildLeaderboard() {
   const lb = document.createElement('div'); lb.className = 'leaderboard';
   entries.forEach(({ uid, profile, secs, running }, idx) => {
     const isMe = uid === currentUser?.uid;
-    const row = document.createElement('div');
+    const row  = document.createElement('div');
     row.className = 'lb-row' + (idx === 0 ? ' rank-1' : '');
 
     const rankStr = idx < 3 ? rankEmojis[idx] : `${idx+1}`;
-    const avSrc = profile?.avatarURL;
-    let avHTML = '';
-    if (avSrc?.startsWith('data:')) {
-      avHTML = `<img src="${avSrc}" alt="">`;
-    } else {
-      avHTML = avSrc || '🐣';
-    }
+    const avSrc   = profile?.avatarURL;
+    const avInner = avSrc?.startsWith('data:')
+      ? `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover">`
+      : (avSrc || '🐣');
 
     row.innerHTML = `
       <div class="lb-rank">${rankStr}</div>
-      <div class="lb-av">${avSrc?.startsWith('data:') ? `<img src="${avSrc}" style="width:100%;height:100%;object-fit:cover">` : (avSrc||'🐣')}</div>
+      <div class="lb-av">${avInner}</div>
       <div class="lb-info">
         <div class="lb-name">${profile?.name || 'Ẩn danh'}${isMe ? ' <span style="font-size:10px;color:var(--blue)">(bạn)</span>' : ''}</div>
         <div class="lb-sub">${_rankingMode === 'today' ? 'Hôm nay' : '7 ngày qua'}</div>
@@ -4242,9 +4286,8 @@ function buildLeaderboard() {
   });
   listEl.appendChild(lb);
 
-  // Live update every second if anyone is running
-  const anyRunning = entries.some(e => e.running);
-  if (anyRunning) {
+  // Refresh every 5s while anyone is live
+  if (entries.some(e => e.running)) {
     setTimeout(() => {
       if (document.getElementById('leaderboard-list')) buildLeaderboard();
     }, 5000);
