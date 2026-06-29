@@ -2214,49 +2214,29 @@ async function startClock() {
 async function stopClock(save) {
   if (!isRunning && !save) return;
 
-  // ── Step 1: Snapshot all state BEFORE changing anything ──
+  // ── Step 1: Snapshot tất cả state TRƯỚC khi thay đổi bất cứ thứ gì ──
   const wasRunning = isRunning;
-
-  // Compute totalSecs. Prefer the local _sessionStartMs (always accurate) over
-  // remoteClocks which may not have been updated yet by the Firestore listener.
   let totalSecs = 0;
+
   if (wasRunning) {
     const cd = remoteClocks[currentUser.uid] || {};
-
-    // Use local start time first (most reliable)
     if (_sessionStartMs) {
-      const localElapsed = Math.floor((Date.now() - _sessionStartMs) / 1000);
-      const accumulated  = cd.accumulated || 0;
-      totalSecs = accumulated + localElapsed;
+      totalSecs = (cd.accumulated || 0) + Math.floor((Date.now() - _sessionStartMs) / 1000);
     } else if (cd.startedAt) {
-      // Fallback: use Firestore Timestamp if available
       const startMs = typeof cd.startedAt.toMillis === 'function'
-        ? cd.startedAt.toMillis()
-        : Number(cd.startedAt);
+        ? cd.startedAt.toMillis() : Number(cd.startedAt);
       totalSecs = (cd.accumulated || 0) + Math.floor((Date.now() - startMs) / 1000);
     } else {
       totalSecs = cd.accumulated || mySeconds || 0;
     }
   }
 
-  // ── Step 2: Mark stopped locally ──
+  // ── Step 2: Dừng local state ──
   isRunning = false;
   _sessionStartMs = null;
   if (clockInterval) { clearInterval(clockInterval); clockInterval = null; }
 
-  // ── Step 3: Reset Firestore clockStatus (removes card from others' screens) ──
-  if (currentUser && currentRoomId) {
-    await setDoc(doc(db,'rooms',currentRoomId,'clockStatus',currentUser.uid),{
-      running: false, startedAt: null, accumulated: 0
-    }).catch(()=>{});
-    remoteClocks[currentUser.uid] = { running:false, startedAt:null, accumulated:0 };
-  }
-
-  // Reset clock display to 0
-  const te = document.getElementById('clocktime-'+currentUser?.uid);
-  if (te) te.textContent = fmtTime(0);
-
-  // ── Step 4: Persist session and notify ──
+  // ── Step 3: Persist TRƯỚC khi reset UI (quan trọng — thứ tự không đổi) ──
   if (save && currentUser && currentRoomId && totalSecs >= 900) {
     await addStudySeconds(totalSecs);
     notify('Đã lưu ' + fmtTime(totalSecs) + ' vào lịch hôm nay! 📅', 'success', '🗓️');
@@ -2266,7 +2246,19 @@ async function stopClock(save) {
     toast('Cần học ít nhất 15 phút để điểm danh 😊');
   }
 
+  // ── Step 4: Reset Firestore clockStatus (xóa card khỏi màn hình mọi người) ──
+  if (currentUser && currentRoomId) {
+    setDoc(doc(db,'rooms',currentRoomId,'clockStatus',currentUser.uid),{
+      running: false, startedAt: null, accumulated: 0
+    }).catch(()=>{});
+    remoteClocks[currentUser.uid] = { running:false, startedAt:null, accumulated:0 };
+  }
+
+  // ── Step 5: Reset UI ──
+  const te = document.getElementById('clocktime-'+currentUser?.uid);
+  if (te) te.textContent = fmtTime(0);
   mySeconds = 0; lastAutoSaved = 0;
+  renderClocks();
 }
 
 async function addStudySeconds(secs) {
@@ -2318,39 +2310,45 @@ function scheduleMidnightReset() {
 }
 scheduleMidnightReset();
 
-// ── pagehide / beforeunload: unified exit cleanup ──
-// Firebase SDK calls are cancelled by browser on tab close.
-// Use Firestore REST API with fetch keepalive instead.
-function _firestoreSet(path, data) {
-  // Convert JS object to Firestore REST format
-  function toFSValue(v) {
+// ── Exit cleanup: dùng Firestore REST + fetch keepalive ──
+// Firebase SDK calls bị browser hủy khi tab đóng.
+// fetch({ keepalive:true }) đảm bảo request được gửi dù page đã unload.
+function _fsKeepAlive(path, fields) {
+  // Convert flat JS object → Firestore REST fields format
+  const toFV = v => {
     if (v === null || v === undefined) return { nullValue: null };
     if (typeof v === 'boolean') return { booleanValue: v };
-    if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-    if (typeof v === 'string') return { stringValue: v };
+    if (typeof v === 'string')  return { stringValue: v };
+    if (typeof v === 'number')  return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
     return { nullValue: null };
-  }
-  const fields = {};
-  Object.entries(data).forEach(([k,v]) => { fields[k] = toFSValue(v); });
-
-  const project = firebaseConfig.projectId;
-  const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/${path}?updateMask.fieldPaths=${Object.keys(data).join('&updateMask.fieldPaths=')}`;
+  };
+  const fsFields = {};
+  Object.entries(fields).forEach(([k,v]) => { fsFields[k] = toFV(v); });
+  const proj = firebaseConfig.projectId;
+  const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
   try {
-    fetch(url, {
-      method: 'PATCH', keepalive: true,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields })
+    fetch(`https://firestore.googleapis.com/v1/projects/${proj}/databases/(default)/documents/${path}?${mask}`, {
+      method:'PATCH', keepalive:true,
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ fields: fsFields })
     }).catch(()=>{});
+  } catch(e) {}
+}
+
+function _fsDeleteKA(path) {
+  const proj = firebaseConfig.projectId;
+  try {
+    fetch(`https://firestore.googleapis.com/v1/projects/${proj}/databases/(default)/documents/${path}`,
+      { method:'DELETE', keepalive:true }).catch(()=>{});
   } catch(e) {}
 }
 
 function _emergencyCleanup() {
   if (!currentUser || !currentRoomId) return;
 
-  // ── 1. Stop timer & save session ──
+  // ── 1. Timer: snapshot → lưu nếu ≥15p → reset Firestore ──
   if (isRunning) {
     isRunning = false;
-
     let totalSecs = 0;
     if (_sessionStartMs) {
       const cd = remoteClocks[currentUser.uid] || {};
@@ -2358,32 +2356,30 @@ function _emergencyCleanup() {
     } else {
       const cd = remoteClocks[currentUser.uid] || {};
       if (cd.startedAt) {
-        const startMs = typeof cd.startedAt.toMillis === 'function'
+        const ms = typeof cd.startedAt.toMillis === 'function'
           ? cd.startedAt.toMillis() : Number(cd.startedAt);
-        totalSecs = (cd.accumulated || 0) + Math.floor((Date.now() - startMs) / 1000);
+        totalSecs = (cd.accumulated || 0) + Math.floor((Date.now() - ms) / 1000);
       } else {
         totalSecs = cd.accumulated || mySeconds || 0;
       }
     }
     _sessionStartMs = null;
 
-    // Reset clockStatus via keepalive fetch
-    _firestoreSet(
+    // Reset clockStatus (keepalive)
+    _fsKeepAlive(
       `rooms/${currentRoomId}/clockStatus/${currentUser.uid}`,
       { running: false, accumulated: 0 }
     );
-
-    // Save study time if >= 15 min
+    // Lưu studyDays nếu ≥15 phút (keepalive, no-read merge)
     if (totalSecs >= 900) {
-      const toWrite = Math.max(totalSecs, lastAutoSaved);
-      _firestoreSet(
+      _fsKeepAlive(
         `rooms/${currentRoomId}/studyDays/${todayKey()}`,
-        { [currentUser.uid]: toWrite }
+        { [currentUser.uid]: Math.max(totalSecs, lastAutoSaved) }
       );
     }
   }
 
-  // ── 2. End video call ──
+  // ── 2. Video call: dừng media + đóng peers + xóa Firestore ──
   if (localStream) {
     localStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
     localStream = null;
@@ -2391,20 +2387,13 @@ function _emergencyCleanup() {
   Object.values(peerConns || {}).forEach(pc => { try { pc.close(); } catch(e) {} });
   peerConns = {};
 
-  // Remove from callParticipants via keepalive DELETE
-  try {
-    const project = firebaseConfig.projectId;
-    fetch(
-      `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/rooms/${currentRoomId}/callParticipants/${currentUser.uid}`,
-      { method: 'DELETE', keepalive: true }
-    ).catch(()=>{});
-  } catch(e) {}
+  // Xóa khỏi callParticipants (keepalive DELETE)
+  _fsDeleteKA(`rooms/${currentRoomId}/callParticipants/${currentUser.uid}`);
+  // Deactivate call invite (keepalive PATCH)
+  _fsKeepAlive(`rooms/${currentRoomId}/call/invite`, { active: false });
 
-  // Deactivate invite if I started the call
-  _firestoreSet(`rooms/${currentRoomId}/call/invite`, { active: false });
-
-  // ── 3. Unsubscribe listeners ──
-  if (typeof callPartUnsub === 'function')    { try { callPartUnsub(); }    catch(e) {} callPartUnsub = null; }
+  // ── 3. Hủy listeners ──
+  if (typeof callPartUnsub    === 'function') { try { callPartUnsub();    } catch(e) {} callPartUnsub    = null; }
   if (typeof clockStatusUnsub === 'function') { try { clockStatusUnsub(); } catch(e) {} clockStatusUnsub = null; }
   if (remoteClockTick) { clearInterval(remoteClockTick); remoteClockTick = null; }
 }
@@ -4055,7 +4044,7 @@ function getMonthKeys(year, month) {
 
 /* ── Draw SVG bar chart ── */
 function drawBarChart(container, labels, values, colors, maxVal, streakDays) {
-  if (!container) return; // null guard
+  if (!container) return;  // null guard — tránh crash khi element chưa mount
   const W = 560, H = 160, PL = 30, PR = 10, PT = 20, PB = 30;
   const chartW = W - PL - PR, chartH = H - PT - PB;
   const n = labels.length;
@@ -4097,6 +4086,7 @@ function drawBarChart(container, labels, values, colors, maxVal, streakDays) {
 
 /* ═══════ WEEKLY CHART ═══════ */
 function renderWeeklyChart(body) {
+  // Guard: must be in a room
   if (!currentRoomId) {
     body.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px;font-weight:700">Vào phòng học để xem thống kê 📚</p>';
     return;
@@ -4137,7 +4127,6 @@ function renderWeeklyChart(body) {
     ${totalSecs === 0 ? '<p style="text-align:center;color:var(--muted);padding:12px;font-size:13px;font-weight:700">Chưa có dữ liệu tuần này — bắt đầu học thôi! 🚀</p>' : ''}`;
 
   const streakDays = keys.map(k => (studyData[k]?.[currentUser?.uid] || 0) >= 900);
-  // Dùng body.querySelector thay vì getElementById để tránh lấy nhầm element cũ
   drawBarChart(body.querySelector('#weekly-chart-svg'), labels, values, colors, maxVal, streakDays);
 }
 
