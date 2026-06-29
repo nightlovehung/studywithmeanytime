@@ -120,15 +120,38 @@
     /* ── HOME ── */
     #screen-home {
       flex-direction:column; align-items:center; justify-content:center;
-      padding:24px; background:linear-gradient(160deg,#e8f8e0 0%,#d4f0ff 100%);
+      padding:24px; background:linear-gradient(160deg,var(--theme-bg,#e8f8e0) 0%,var(--theme-l,#d4f0ff) 100%);
+      position:relative; overflow:hidden;
+    }
+    /* Particle canvas sits behind everything */
+    #bg-canvas {
+      position:absolute; inset:0; pointer-events:none; z-index:0;
     }
     .home-card {
-      background:var(--card); border-radius:24px; padding:36px 28px;
-      width:100%; max-width:420px; box-shadow:0 8px 32px rgba(0,0,0,.08);
+      background:rgba(255,255,255,.88); backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+      border-radius:24px; padding:36px 28px;
+      width:100%; max-width:420px; box-shadow:0 8px 40px rgba(0,0,0,.10);
+      position:relative; z-index:1;
+      border:1.5px solid rgba(255,255,255,.7);
     }
-    .home-header { display:flex; align-items:center; gap:12px; margin-bottom:28px; }
-    .home-header h2 { font-size:18px; font-weight:900; color:var(--green-d); }
+    .home-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+    .home-header h2 { font-size:18px; font-weight:900; color:var(--theme-d); }
     .home-header p  { font-size:13px; color:var(--muted); }
+    /* Quick action row at the top of the card */
+    .home-quick-actions {
+      display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap;
+    }
+    .home-quick-btn {
+      display:flex; align-items:center; gap:6px;
+      padding:7px 13px; border:1.5px solid var(--border);
+      border-radius:14px; background:#fff; cursor:pointer;
+      font-family:'Nunito',sans-serif; font-size:12px; font-weight:800;
+      color:var(--text); transition:border-color .15s, background .15s;
+      white-space:nowrap;
+    }
+    .home-quick-btn:hover { border-color:var(--theme); background:var(--theme-l); color:var(--theme-d); }
+    .home-quick-btn.danger:hover { border-color:#e74c3c; background:#fff5f5; color:#e74c3c; }
     .section-label {
       font-size:11px; font-weight:800; letter-spacing:.08em;
       text-transform:uppercase; color:var(--muted); margin-bottom:10px;
@@ -136,7 +159,7 @@
     .rooms-list { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
     .room-chip {
       display:flex; align-items:center; gap:12px; padding:14px 16px;
-      background:#f0fdf4; border:2px solid var(--border); border-radius:var(--radius);
+      background:rgba(255,255,255,.8); border:2px solid var(--border); border-radius:var(--radius);
       cursor:pointer; transition:border-color .2s,background .2s; color:inherit;
     }
     .room-chip:hover { border-color:var(--theme); background:var(--theme-l); }
@@ -144,7 +167,7 @@
     .room-chip-members { font-size:12px; color:var(--muted); }
     .empty-rooms {
       text-align:center; padding:24px; color:var(--muted); font-size:14px;
-      background:#f9fffe; border-radius:var(--radius);
+      background:rgba(255,255,255,.6); border-radius:var(--radius);
       border:2px dashed var(--border); margin-bottom:20px;
     }
     .home-actions { display:flex; flex-direction:column; gap:10px; }
@@ -1031,6 +1054,9 @@
 
 <!-- ══ HOME ══ -->
 <div id="screen-home" class="screen">
+  <!-- Particle background canvas -->
+  <canvas id="bg-canvas"></canvas>
+
   <div class="home-card">
     <div class="home-header">
       <div id="home-avatar-wrap"></div>
@@ -1044,6 +1070,15 @@
         </div>
       </div>
     </div>
+
+    <!-- Quick actions: edit name, avatar, theme, logout -->
+    <div class="home-quick-actions">
+      <button class="home-quick-btn" id="home-btn-edit-name">✏️ Chỉnh sửa tên</button>
+      <button class="home-quick-btn" id="home-btn-edit-avatar">🖼️ Đổi avatar</button>
+      <button class="home-quick-btn" id="home-btn-theme">🎨 Giao diện</button>
+      <button class="home-quick-btn danger" id="home-btn-logout">🚪 Đăng xuất</button>
+    </div>
+
     <div class="section-label">Phòng học của bạn</div>
     <div id="rooms-list" class="rooms-list"></div>
     <div class="home-actions">
@@ -1379,10 +1414,189 @@ let micOn = true, camOn = true;
 let facingMode = 'user';
 
 /* ── HELPERS ── */
+/* ══════════════════════════════════════════
+   BACKGROUND PARTICLES — BackgroundEffects
+   Config: change BG_EFFECT to switch style
+   Options: 'petals' | 'dust' | 'rain' | 'stars'
+══════════════════════════════════════════ */
+const BG_EFFECT = 'petals'; // ← switch effect here
+
+let _bgAnim = null;
+
+const BackgroundEffects = {
+  /* ── shared state ── */
+  particles: [],
+  canvas: null,
+  ctx: null,
+  raf: null,
+  running: false,
+
+  init(canvasEl) {
+    this.canvas = canvasEl;
+    this.ctx    = canvasEl.getContext('2d');
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    this.particles = [];
+    const cfg = this._cfg();
+    for (let i = 0; i < cfg.count; i++) this.particles.push(this._make(cfg, true));
+    this.running = true;
+    this._loop(cfg);
+  },
+
+  stop() {
+    this.running = false;
+    if (this.raf) { cancelAnimationFrame(this.raf); this.raf = null; }
+    if (this.ctx) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  },
+
+  resize() {
+    if (!this.canvas) return;
+    this.canvas.width  = this.canvas.offsetWidth  || window.innerWidth;
+    this.canvas.height = this.canvas.offsetHeight || window.innerHeight;
+  },
+
+  _cfg() {
+    const theme = getComputedStyle(document.documentElement).getPropertyValue('--theme').trim() || '#58CC02';
+    const configs = {
+      petals: {
+        count:42, minSize:4, maxSize:12, speed:.35, wobble:true,
+        colors:['#ffb7c5','#ffd6e0','#fff0f3','#ffccd5','#f8a5b8',
+                '#e8f8e0','#d4f0ff','rgba(255,183,197,.5)'],
+        shape:'petal',
+        drift: +.55, // diagonal: positive = right→left
+      },
+      dust: {
+        count:55, minSize:2, maxSize:5, speed:.25, wobble:true,
+        colors:['rgba(255,255,255,.7)','rgba(200,240,255,.6)','rgba(180,255,200,.5)'],
+        shape:'circle', drift: .3,
+      },
+      rain: {
+        count:60, minSize:1, maxSize:3, speed:2.5, wobble:false,
+        colors:['rgba(100,180,255,.6)','rgba(150,210,255,.4)'],
+        shape:'streak', drift: .2,
+      },
+      stars: {
+        count:35, minSize:1, maxSize:4, speed:.15, wobble:true,
+        colors:['rgba(255,255,255,.9)','rgba(255,220,100,.8)','rgba(200,220,255,.8)'],
+        shape:'star', drift: .1,
+      },
+    };
+    return configs[BG_EFFECT] || configs.petals;
+  },
+
+  _make(cfg, scatter) {
+    const size  = cfg.minSize + Math.random() * (cfg.maxSize - cfg.minSize);
+    const color = cfg.colors[Math.floor(Math.random() * cfg.colors.length)];
+    const W = this.canvas.width, H = this.canvas.height;
+    return {
+      x:     scatter ? Math.random() * W : W + size,
+      y:     scatter ? Math.random() * H : -size,
+      size,  color,
+      speed: cfg.speed * (.7 + Math.random() * .6),
+      drift: cfg.drift * (.8 + Math.random() * .4),
+      angle: Math.random() * Math.PI * 2,
+      spin:  (Math.random() - .5) * .04,
+      wobbleAmp:  cfg.wobble ? (.3 + Math.random() * .5) : 0,
+      wobbleFreq: .015 + Math.random() * .015,
+      wobbleOff:  Math.random() * Math.PI * 2,
+      t: 0,
+    };
+  },
+
+  _loop(cfg) {
+    if (!this.running) return;
+    const { ctx, canvas } = this;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const W = canvas.width, H = canvas.height;
+
+    this.particles.forEach(p => {
+      p.t++;
+      // drift diagonally: down + slight left
+      p.y += p.speed;
+      p.x -= p.drift + Math.sin(p.t * p.wobbleFreq + p.wobbleOff) * p.wobbleAmp;
+      p.angle += p.spin;
+
+      // Recycle when off-screen
+      if (p.y > H + 20 || p.x < -40) {
+        const fresh = this._make(cfg, false);
+        Object.assign(p, fresh);
+      }
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      ctx.globalAlpha = .65 + .25 * Math.sin(p.t * .02 + p.wobbleOff);
+
+      switch(BG_EFFECT) {
+        case 'petals':  this._drawPetal(ctx, p); break;
+        case 'dust':    this._drawCircle(ctx, p); break;
+        case 'rain':    this._drawStreak(ctx, p); break;
+        case 'stars':   this._drawStar(ctx, p); break;
+        default:        this._drawPetal(ctx, p);
+      }
+      ctx.restore();
+    });
+
+    this.raf = requestAnimationFrame(() => this._loop(cfg));
+  },
+
+  _drawPetal(ctx, p) {
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    // Teardrop/petal shape
+    ctx.moveTo(0, -p.size);
+    ctx.bezierCurveTo(p.size * .8, -p.size * .5, p.size * .8, p.size * .5, 0, p.size);
+    ctx.bezierCurveTo(-p.size * .8, p.size * .5, -p.size * .8, -p.size * .5, 0, -p.size);
+    ctx.fill();
+  },
+
+  _drawCircle(ctx, p) {
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
+  _drawStreak(ctx, p) {
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = p.size;
+    ctx.beginPath();
+    ctx.moveTo(0, -p.size * 4);
+    ctx.lineTo(0, p.size * 4);
+    ctx.stroke();
+  },
+
+  _drawStar(ctx, p) {
+    ctx.fillStyle = p.color;
+    const s = p.size, pts = 4;
+    ctx.beginPath();
+    for (let i = 0; i < pts * 2; i++) {
+      const r  = i % 2 === 0 ? s : s * .4;
+      const a  = (i * Math.PI) / pts;
+      i === 0 ? ctx.moveTo(r * Math.sin(a), -r * Math.cos(a))
+              : ctx.lineTo(r * Math.sin(a), -r * Math.cos(a));
+    }
+    ctx.closePath();
+    ctx.fill();
+  },
+};
+
+/* Start/stop particles with screen visibility */
+function startBgParticles() {
+  const canvas = document.getElementById('bg-canvas');
+  if (!canvas) return;
+  BackgroundEffects.stop();
+  BackgroundEffects.init(canvas);
+}
+function stopBgParticles() { BackgroundEffects.stop(); }
+
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.getElementById('screen-loading').style.display = 'none';
+  // Start/stop background particles on home screen only
+  if (id === 'screen-home') setTimeout(startBgParticles, 50);
+  else stopBgParticles();
 }
 
 // Countdown hiển thị trên loading screen
@@ -2264,6 +2478,21 @@ async function doLogout() {
   await signOut(auth);
 }
 document.getElementById('menu-logout').addEventListener('click', doLogout);
+
+/* ── Home screen quick-action buttons ── */
+document.getElementById('home-btn-edit-name').addEventListener('click', () => {
+  document.getElementById('edit-name-input').value = userProfile?.name || '';
+  openModal('modal-editname');
+});
+document.getElementById('home-btn-edit-avatar').addEventListener('click', () => {
+  openModal('modal-edit-avatar');
+  buildAvatarGrid('edit-avatar-grid', sel => { selectedEditAvatar = sel; });
+});
+document.getElementById('home-btn-theme').addEventListener('click', () => {
+  buildThemeSwatches();
+  openModal('modal-theme');
+});
+document.getElementById('home-btn-logout').addEventListener('click', doLogout);
 
 /* ══════════════════════════════════════════
    THEME SYSTEM
