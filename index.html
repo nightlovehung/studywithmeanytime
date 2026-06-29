@@ -2282,41 +2282,87 @@ function scheduleMidnightReset() {
 }
 scheduleMidnightReset();
 
-// pagehide: tự lưu khi đóng tab / thoát trang
-window.addEventListener('pagehide', ()=>{
+// ── pagehide / beforeunload: stop timer, save session, cleanup call ──
+// Uses a synchronous-compatible approach: write with setDoc (no pre-read)
+// because getDoc inside pagehide can be cancelled by the browser.
+function _emergencyCleanup() {
   if (!currentUser || !currentRoomId) return;
 
-  // ── 1. Dừng đồng hồ & lưu thời gian học ──
+  // ── 1. Stop timer & save session ──
   if (isRunning) {
-    const cd = remoteClocks[currentUser.uid]||{};
-    const elapsed = cd.startedAt
-      ? Math.floor((Date.now()-cd.startedAt.toMillis())/1000) : mySeconds;
-    const total = (cd.accumulated||0)+elapsed;
-    // Reset clockStatus
-    setDoc(doc(db,'rooms',currentRoomId,'clockStatus',currentUser.uid),
-      {running:false,startedAt:null,accumulated:0}).catch(()=>{});
-    // Lưu thời gian tuyệt đối (dùng MAX nên không bị cộng 2 lần)
-    if (total >= 900) addStudySeconds(total).catch(()=>{});
+    isRunning = false;
+    const cd = remoteClocks[currentUser.uid] || {};
+
+    // Compute elapsed. startedAt from Firestore may be a Timestamp object or a plain number.
+    let startMs = null;
+    if (cd.startedAt) {
+      startMs = typeof cd.startedAt.toMillis === 'function'
+        ? cd.startedAt.toMillis()
+        : Number(cd.startedAt);
+    }
+    const elapsed = startMs ? Math.floor((Date.now() - startMs) / 1000) : mySeconds;
+    const totalSecs = (cd.accumulated || 0) + elapsed;
+
+    // Reset clockStatus — fire and forget (best-effort on pagehide)
+    setDoc(
+      doc(db, 'rooms', currentRoomId, 'clockStatus', currentUser.uid),
+      { running: false, startedAt: null, accumulated: 0 }
+    ).catch(() => {});
+
+    // Save study time if >= 15 min.
+    // Use setDoc with merge + field override instead of read-then-write,
+    // so we don't need a getDoc round-trip that browsers may cancel.
+    if (totalSecs >= 900) {
+      const tk = todayKey();
+      // We write the session seconds. If a larger value was already saved
+      // by the auto-save interval (lastAutoSaved), use that instead.
+      const toWrite = Math.max(totalSecs, lastAutoSaved);
+      setDoc(
+        doc(db, 'rooms', currentRoomId, 'studyDays', tk),
+        { [currentUser.uid]: toWrite },
+        { merge: true }   // merge so other users' fields are preserved
+      ).catch(() => {});
+    }
   }
 
-  // ── 2. Kết thúc video call (nếu đang trong call) ──
-  const inCall = document.getElementById('screen-call')?.classList.contains('active');
-  if (inCall || localStream) {
-    // Dừng tất cả media tracks
-    if (localStream) { localStream.getTracks().forEach(t=>t.stop()); }
-    // Xóa khỏi callParticipants
-    deleteDoc(doc(db,'rooms',currentRoomId,'callParticipants',currentUser.uid)).catch(()=>{});
-    // Nếu là người khởi xướng, hủy invite
-    try {
-      const invData = remoteClocks['__callInvite__'];
-      if (invData?.startedBy === currentUser.uid) {
-        setDoc(doc(db,'rooms',currentRoomId,'call','invite'),{active:false},{merge:true}).catch(()=>{});
-      }
-    } catch(e){}
-    // Đóng tất cả peer connections
-    Object.values(peerConns||{}).forEach(pc=>{ try{pc.close();}catch(e){} });
+  // ── 2. End video call & release all media resources ──
+  // Always clean up, regardless of whether screen-call is active,
+  // because localStream may exist even when the call UI is hidden.
+  if (localStream) {
+    localStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
+    localStream = null;
   }
-});
+
+  // Close all WebRTC peer connections
+  Object.values(peerConns || {}).forEach(pc => { try { pc.close(); } catch(e) {} });
+  peerConns = {};
+
+  // Remove self from callParticipants
+  deleteDoc(
+    doc(db, 'rooms', currentRoomId, 'callParticipants', currentUser.uid)
+  ).catch(() => {});
+
+  // If self is the call initiator, deactivate the invite so others don't see a ghost call
+  try {
+    const invSnap = remoteClocks['__callInvite__'];
+    if (invSnap?.startedBy === currentUser.uid) {
+      setDoc(
+        doc(db, 'rooms', currentRoomId, 'call', 'invite'),
+        { active: false },
+        { merge: true }
+      ).catch(() => {});
+    }
+  } catch(e) {}
+
+  // Unsubscribe all listeners to prevent memory leaks
+  if (typeof callPartUnsub === 'function') { try { callPartUnsub(); } catch(e) {} callPartUnsub = null; }
+  if (typeof clockStatusUnsub === 'function') { try { clockStatusUnsub(); } catch(e) {} clockStatusUnsub = null; }
+  if (remoteClockTick) { clearInterval(remoteClockTick); remoteClockTick = null; }
+}
+
+window.addEventListener('pagehide', _emergencyCleanup);
+// beforeunload fires more reliably on desktop browsers (Chrome, Firefox)
+window.addEventListener('beforeunload', _emergencyCleanup);
 
 /* ══════════════════════════════════════════
    CALENDAR
@@ -3907,11 +3953,17 @@ document.querySelectorAll('.analytics-tab').forEach(btn => {
 /* ── Tab router ── */
 function renderAnalyticsTab(tab) {
   const body = document.getElementById('analytics-body');
-  body.innerHTML = '<div class="spinner" style="margin:40px auto"></div>';
-  if (tab === 'weekly')       renderWeeklyChart(body);
-  else if (tab === 'monthly') renderMonthlyChart(body);
-  else if (tab === 'ranking') renderRanking(body);
-  else if (tab === 'achievements') renderAchievements(body);
+  if (!body) return;
+  // Clear immediately — render functions write their own content
+  body.innerHTML = '';
+  try {
+    if (tab === 'weekly')            renderWeeklyChart(body);
+    else if (tab === 'monthly')      renderMonthlyChart(body);
+    else if (tab === 'ranking')      renderRanking(body);
+    else if (tab === 'achievements') renderAchievements(body);
+  } catch(err) {
+    body.innerHTML = `<p style="text-align:center;color:var(--red);padding:32px;font-weight:700">Lỗi tải dữ liệu 😔<br><span style="font-size:12px;opacity:.7">${err.message}</span></p>`;
+  }
 }
 
 /* ── Helpers ── */
@@ -3990,6 +4042,12 @@ function drawBarChart(container, labels, values, colors, maxVal, streakDays) {
 
 /* ═══════ WEEKLY CHART ═══════ */
 function renderWeeklyChart(body) {
+  // Guard: must be in a room
+  if (!currentRoomId) {
+    body.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px;font-weight:700">Vào phòng học để xem thống kê 📚</p>';
+    return;
+  }
+
   const keys = getLast7Keys();
   const labels = keys.map(getDayLabel);
   const values = keys.map(getMySecsOnDay);
@@ -4021,7 +4079,8 @@ function renderWeeklyChart(body) {
     <div class="chart-wrap" id="weekly-chart-svg"></div>
     <p style="font-size:11px;color:var(--muted);font-weight:700;text-align:center;margin-top:4px">
       🔵 = hôm nay &nbsp;•&nbsp; 🟡 = ngày streak đủ 15p
-    </p>`;
+    </p>
+    ${totalSecs === 0 ? '<p style="text-align:center;color:var(--muted);padding:12px;font-size:13px;font-weight:700">Chưa có dữ liệu tuần này — bắt đầu học thôi! 🚀</p>' : ''}`;
 
   const streakDays = keys.map(k => (studyData[k]?.[currentUser?.uid] || 0) >= 900);
   drawBarChart(document.getElementById('weekly-chart-svg'), labels, values, colors, maxVal, streakDays);
@@ -4029,6 +4088,11 @@ function renderWeeklyChart(body) {
 
 /* ═══════ MONTHLY CHART ═══════ */
 function renderMonthlyChart(body) {
+  if (!currentRoomId) {
+    body.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px;font-weight:700">Vào phòng học để xem thống kê 📚</p>';
+    return;
+  }
+
   const now = new Date();
   const year = now.getFullYear(), month = now.getMonth();
   const keys = getMonthKeys(year, month);
@@ -4041,8 +4105,6 @@ function renderMonthlyChart(body) {
 
   const totalSecs = values.reduce((a,b) => a+b, 0);
   const studiedDays = values.filter(v => v >= 900).length;
-
-  // Calc streak
   const streak = calcStreak();
 
   body.innerHTML = `
@@ -4063,7 +4125,8 @@ function renderMonthlyChart(body) {
     <div class="chart-wrap" id="monthly-chart-svg"></div>
     <p style="font-size:11px;color:var(--muted);font-weight:700;text-align:center;margin-top:4px">
       🟡 = ngày streak &nbsp;•&nbsp; 🔵 = hôm nay
-    </p>`;
+    </p>
+    ${totalSecs === 0 ? '<p style="text-align:center;color:var(--muted);padding:12px;font-size:13px;font-weight:700">Chưa có dữ liệu tháng này — bắt đầu học thôi! 🚀</p>' : ''}`;
 
   drawBarChart(document.getElementById('monthly-chart-svg'), labels, values, colors, maxVal, streakDays);
 }
@@ -4073,6 +4136,10 @@ let _rankingMode = 'today'; // 'today' | 'week'
 let _rankingUnsub = null;
 
 function renderRanking(body) {
+  if (!currentRoomId) {
+    body.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px;font-weight:700">Vào phòng học để xem bảng xếp hạng 🏆</p>';
+    return;
+  }
   body.innerHTML = `
     <div class="sub-toggle" id="rank-toggle">
       <button class="sub-toggle-btn active" data-mode="today">Hôm nay</button>
@@ -4271,6 +4338,10 @@ function calcAchievementStats() {
 let _prevUnlocked = new Set();
 
 function renderAchievements(body) {
+  if (!currentUser) {
+    body.innerHTML = '<p style="text-align:center;color:var(--muted);padding:40px;font-weight:700">Đăng nhập để xem thành tích 🎖</p>';
+    return;
+  }
   const stats = calcAchievementStats();
   const unlockedIds = BADGE_DEFS.filter(b => b.check(stats)).map(b => b.id);
 
